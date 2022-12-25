@@ -6,4 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rspotify = "0.11.6"
+rspotify = { version = "0.11.6", features = ["cli"] }
+serde = "1.0.151"
+serde_json = "1.0.91"
+tokio = {version = "1.23.0", features=["rt","macros","rt-multi-thread"]}
