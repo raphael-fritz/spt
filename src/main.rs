@@ -42,27 +42,22 @@ fn save_token(token: rspotify::Token, path: &Path) {
     }
 }
 
-async fn auth_with_prev_token(spotify: &AuthCodeSpotify) {
+fn auth_with_prev_token(spotify: &AuthCodeSpotify) {
     let prev_token = load_token(Path::new(TOKEN_PATH));
-    *spotify.token.lock().await.unwrap() = Some(prev_token.unwrap());
-    spotify
-        .refresh_token()
-        .await
-        .expect("Couldn't refresh token!");
+    *spotify.token.lock().unwrap() = Some(prev_token.unwrap());
+    spotify.refresh_token().expect("Couldn't refresh token!");
 }
 
-async fn auth_with_fresh_token(spotify: &AuthCodeSpotify, url: &str) {
+fn auth_with_fresh_token(spotify: &AuthCodeSpotify, url: &str) {
     spotify
         .prompt_for_token(url)
-        .await
         .expect("Couldn't authenticate succesfully!");
 
-    let token = spotify.get_token().lock().await.unwrap().clone().unwrap();
+    let token = spotify.get_token().lock().unwrap().clone().unwrap();
     save_token(token.clone(), Path::new(TOKEN_PATH));
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let creds = Credentials::new(
         "7d5c06725d314f0b975c88c7ca23b4d8",
         "832bd9a9d9144c62a3b1c3e9c26906ff",
@@ -77,26 +72,20 @@ async fn main() {
     let spotify = AuthCodeSpotify::new(creds, oauth);
     let url = spotify.get_authorize_url(false).unwrap();
     //auth_with_fresh_token(&spotify, &url).await;
-    auth_with_prev_token(&spotify).await;
+    auth_with_prev_token(&spotify);
 
     // Running the requests
-    let user = spotify
-        .current_user()
-        .await
-        .expect("Couldn't get current user!");
+    let user = spotify.current_user().expect("Couldn't get current user!");
 
-    let currently_playing = spotify
-        .current_playing(
-            Some(Market::Country(Country::Austria)),
-            Some(&[AdditionalType::Episode]),
-        )
-        .await;
+    let currently_playing = spotify.current_playing(
+        Some(Market::Country(Country::Austria)),
+        Some(&[AdditionalType::Episode]),
+    );
     println!("Currently playing: {currently_playing:?}");
 
     let token_expiry = spotify
         .get_token()
         .lock()
-        .await
         .unwrap()
         .clone()
         .unwrap()
