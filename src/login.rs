@@ -1,75 +1,97 @@
 use rspotify::{prelude::*, scopes, AuthCodeSpotify, Credentials, OAuth};
 use serde_json;
-use std::fs::File;
-use std::io::prelude::*;
+use std::error;
+use std::fmt;
+use std::fs;
 use std::path::Path;
 
-static TOKEN_PATH: &str = "token.tmp";
+const TOKEN_PATH: &str = "token.tmp";
+const CLIENT_ID: &str = "7d5c06725d314f0b975c88c7ca23b4d8";
+const CLIENT_SECRET: &str = "832bd9a9d9144c62a3b1c3e9c26906ff";
+const REDIRECT_URI: &str = "http://localhost:65432";
+const SCOPES: &str = "playlist-modify-public, user-read-currently-playing";
 
-fn load_token(path: &Path) -> std::io::Result<rspotify::Token> {
-    let display = path.display();
-
-    let mut f = File::open(&path)?;
-    let mut s = String::new();
-    f.read_to_string(&mut s)?;
-
-    let token: rspotify::Token = match serde_json::from_str(&s) {
-        Err(why) => panic!("Couldn't load token from {display}: {why}"),
-        Ok(token) => token,
-    };
-    return Ok(token);
+#[derive(Debug)]
+pub enum AuthenticationError {
+    IOError(std::io::Error),
+    ParseError(serde_json::Error),
+    ClientError(rspotify::ClientError),
 }
 
-fn save_token(token: rspotify::Token, path: &Path) {
-    let display = path.display();
-
-    // Open a file in write-only mode, returns `io::Result<File>`
-    let mut file = match File::create(&path) {
-        Err(why) => panic!("couldn't create {}: {}", display, why),
-        Ok(file) => file,
-    };
-
-    let t = serde_json::to_string(&token).unwrap();
-    match file.write_all(t.as_bytes()) {
-        Err(why) => panic!("couldn't write to {}: {}", display, why),
-        Ok(_) => println!("successfully wrote to {}", display),
+impl fmt::Display for AuthenticationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AuthenticationError::IOError(err) => write!(f, "{}", err),
+            AuthenticationError::ParseError(err) => write!(f, "{}", err),
+            AuthenticationError::ClientError(err) => write!(f, "{}", err),
+        }
     }
 }
 
-fn auth_with_prev_token(spotify: &AuthCodeSpotify) {
-    let prev_token = load_token(Path::new(TOKEN_PATH));
-    *spotify.token.lock().unwrap() = Some(prev_token.unwrap());
-    spotify.refresh_token().expect("Couldn't refresh token!");
+impl From<std::io::Error> for AuthenticationError {
+    fn from(err: std::io::Error) -> Self {
+        AuthenticationError::IOError(err)
+    }
 }
 
-fn auth_with_fresh_token(spotify: &AuthCodeSpotify, url: &str) {
-    spotify
-        .prompt_for_token(url)
-        .expect("Couldn't authenticate succesfully!");
-
-    let token = spotify.get_token().lock().unwrap().clone().unwrap();
-    save_token(token.clone(), Path::new(TOKEN_PATH));
+impl From<serde_json::Error> for AuthenticationError {
+    fn from(err: serde_json::Error) -> Self {
+        AuthenticationError::ParseError(err)
+    }
 }
 
-pub fn login() -> AuthCodeSpotify {
-    let creds = Credentials::new(
-        "7d5c06725d314f0b975c88c7ca23b4d8",
-        "832bd9a9d9144c62a3b1c3e9c26906ff",
-    );
+impl From<rspotify::ClientError> for AuthenticationError {
+    fn from(err: rspotify::ClientError) -> Self {
+        AuthenticationError::ClientError(err)
+    }
+}
 
+impl error::Error for AuthenticationError {}
+
+fn load_token(path: &Path) -> Result<rspotify::Token, AuthenticationError> {
+    let token = fs::read_to_string(&path)?;
+    let token = serde_json::from_str(&token)?;
+    Ok(token)
+}
+
+fn save_token(token: rspotify::Token, path: &Path) -> Result<(), AuthenticationError> {
+    let file = fs::File::create(&path)?;
+    Ok(serde_json::to_writer(file, &token)?)
+}
+
+fn auth_with_prev_token(spotify: &AuthCodeSpotify) -> Result<(), AuthenticationError> {
+    let prev_token = load_token(Path::new(TOKEN_PATH))?;
+    *spotify.token.lock().unwrap() = Some(prev_token);
+    Ok(spotify.refresh_token()?)
+}
+
+fn auth_with_fresh_token(spotify: &AuthCodeSpotify) -> Result<(), AuthenticationError> {
+    let url = spotify.get_authorize_url(true)?;
+    spotify.prompt_for_token(&url)?;
+    Ok(())
+}
+
+pub fn login() -> Result<AuthCodeSpotify, AuthenticationError> {
+    let creds = Credentials::new(CLIENT_ID, CLIENT_SECRET);
     let oauth = OAuth {
-        redirect_uri: "http://localhost:65432".to_string(),
-        scopes: scopes!("playlist-modify-public, user-read-currently-playing"),
+        redirect_uri: REDIRECT_URI.to_string(),
+        scopes: scopes!(SCOPES),
         ..Default::default()
     };
-
     let spotify = AuthCodeSpotify::new(creds, oauth);
-    if Path::new(TOKEN_PATH).exists() {
-        auth_with_prev_token(&spotify);
+
+    if auth_with_prev_token(&spotify).is_ok() {
+        println!("Successfully authenticated with saved token!");
     } else {
-        let url = spotify.get_authorize_url(false).unwrap();
-        auth_with_fresh_token(&spotify, &url);
+        auth_with_fresh_token(&spotify)?;
+        println!("Successfully authenticated with fresh token!");
     }
 
-    return spotify;
+    let token = spotify.get_token();
+    match &*token.lock().unwrap() {
+        Some(token) => save_token(token.clone(), Path::new(TOKEN_PATH))?,
+        None => println!("Couldn't save token for further use!"),
+    };
+
+    return Ok(spotify);
 }
