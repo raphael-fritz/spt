@@ -2,3 +2,4 @@
 /.vscode
 *.tmp
 log*.txt
+data.json
