@@ -3,7 +3,7 @@ use rspotify::{model, prelude::BaseClient, ClientResult};
 use serde::{Deserialize, Serialize};
 use std::ops;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct User {
     pub display_name: Option<String>,
     pub id: String,
@@ -34,7 +34,7 @@ impl From<model::PrivateUser> for User {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Artist {
     name: String,
     id: Option<String>,
@@ -48,7 +48,7 @@ impl From<model::SimplifiedArtist> for Artist {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Album {
     artists: Vec<Artist>,
     id: Option<String>,
@@ -68,7 +68,7 @@ impl From<model::SimplifiedAlbum> for Album {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Track {
     artists: Vec<Artist>,
     album: Album,
@@ -90,7 +90,7 @@ impl From<model::FullTrack> for Track {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Episode {
     id: String,
     name: String,
@@ -104,7 +104,7 @@ impl From<model::FullEpisode> for Episode {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PlayableItem {
     Track(Track),
     Episode(Episode),
@@ -118,7 +118,7 @@ impl From<model::PlayableItem> for PlayableItem {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PlaylistItem {
     added_at: Option<DateTime<Utc>>,
     added_by: Option<User>,
@@ -142,7 +142,7 @@ impl From<model::PlaylistItem> for PlaylistItem {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PlaylistItems(pub Vec<PlaylistItem>);
 impl ops::Deref for PlaylistItems {
     type Target = Vec<PlaylistItem>;
@@ -162,8 +162,12 @@ impl From<Vec<ClientResult<model::PlaylistItem>>> for PlaylistItems {
         )
     }
 }
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
+impl FromIterator<PlaylistItem> for PlaylistItems {
+    fn from_iter<T: IntoIterator<Item = PlaylistItem>>(iter: T) -> Self {
+        PlaylistItems(iter.into_iter().collect())
+    }
+}
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Playlist {
     pub collaborative: bool,
     pub description: Option<String>,
