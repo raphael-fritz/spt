@@ -1,69 +1,89 @@
-mod login;
-
-use rspotify::{
-    model::{AdditionalType, Country, Market, PlayableItem},
-    prelude::*,
-};
-
-use chrono::Utc;
+use eventsourcing::{eventstore::EventStore, Aggregate};
+use rspotify::{model::SimplifiedPlaylist, prelude::*, ClientResult};
+use spt::domain;
+use spt::{login, types};
 
 fn main() {
-    let spotify = login::login();
+    let spotify = match login::login() {
+        Ok(spotify) => spotify,
+        Err(why) => panic!("Login failed: {why}"),
+    };
 
-    let market = Some(Market::Country(Country::Austria));
-    //let market: Option<Market> = None;
-    //let additional_types = Some(&[AdditionalType::Episode]);
-    //let additional_types: Option<&[AdditionalType; 1]> = None;
-    let fields: Option<&str> = None;
-
-    // Running the requests
     let user = spotify.current_user().expect("Couldn't get current user!");
 
-    let user_playlists = spotify.user_playlists(user.id.clone());
-    println!("User playlists:");
-    for (i, playlist) in user_playlists.enumerate() {
-        let playlist = playlist.unwrap();
-        println!("{}: {:?}:", i, playlist.name,);
-        for (i, track) in spotify
-            .playlist_items(playlist.id, fields, market)
-            .enumerate()
-        {
-            let track = track.unwrap().track.unwrap();
-            match track {
-                PlayableItem::Track(track) => {
-                    println!(
-                        "\t{}: {}-{}",
-                        i,
-                        track.artists.first().unwrap().name,
-                        track.name
-                    );
-                }
-                _ => (),
-            }
-        }
-    }
+    let user_playlists: Vec<ClientResult<SimplifiedPlaylist>> =
+        spotify.user_playlists(user.id.clone()).collect();
+    let playlist = user_playlists.first().unwrap().as_ref().unwrap();
+    let playlist = types::Playlist::new(spotify, playlist.id.clone(), None, None);
 
-    let currently_playing = spotify.current_playing(
-        Some(Market::Country(Country::Austria)),
-        Some(&[AdditionalType::Episode]),
-    );
-    let currently_playing = currently_playing.unwrap().unwrap().context;
-    println!("Currently playing: {currently_playing:?}");
+    let playlist_store = eventsourcing::eventstore::MemoryEventStore::new();
+    let state = domain::PlaylistData {
+        data: types::Playlist {
+            collaborative: false,
+            description: None,
+            followers: 0,
+            id: String::new(),
+            name: String::new(),
+            owner: types::User {
+                display_name: None,
+                id: String::new(),
+            },
+            public: None,
+            tracks: types::PlaylistItems(vec![]),
+        },
+        generation: 0,
+    };
+    println!("Initial State: {:#?}", state);
 
-    let token_expiry = spotify
-        .get_token()
-        .lock()
-        .unwrap()
-        .clone()
-        .unwrap()
-        .expires_at
+    let playlistcreation = domain::PlaylistCommand::CreatePlaylist(playlist);
+    let create_playlist =
+        domain::PlaylistAggregate::handle_command(&state, &playlistcreation).unwrap();
+    println!("Applied Event: {:#?}", create_playlist[0]);
+
+    let state = domain::PlaylistAggregate::apply_all(&state, &create_playlist).unwrap();
+    println!("State 1: {:#?}", state);
+
+    let store_result = playlist_store
+        .append(create_playlist[0].clone(), "playlists")
         .unwrap();
-    let diff = token_expiry.time() - Utc::now().time();
+    println!("Store result: {:#?}", store_result);
+
+    let namechange = domain::PlaylistCommand::UpdateName("lol".to_string());
+    let change_name = domain::PlaylistAggregate::handle_command(&state, &namechange).unwrap();
+    println!("Applied Event: {:#?}", change_name[0]);
+
+    let state = domain::PlaylistAggregate::apply_all(&state, &change_name).unwrap();
+    println!("State 2: {:#?}", state);
+
+    let store_result = playlist_store
+        .append(change_name[0].clone(), "playlists")
+        .unwrap();
+    println!("Store result: {:#?}", store_result);
+
+    let eventstr = domain::PlaylistEvent::UpdatedName(String::new()).to_string();
     println!(
-        "User ID: {}\nToken expires in: {}:{}:{}",
-        user.id,
-        (diff.num_seconds() / 60) / 60,
-        (diff.num_seconds() / 60) % 60,
-        diff.num_seconds() % 60
+        "all {} events: {:#?}",
+        eventstr,
+        playlist_store.get_all(eventstr.as_str())
+    );
+
+    let eventstr = domain::PlaylistEvent::CreatedPlaylist(types::Playlist {
+        collaborative: false,
+        description: None,
+        followers: 0,
+        id: String::new(),
+        name: String::new(),
+        owner: types::User {
+            display_name: None,
+            id: String::new(),
+        },
+        public: None,
+        tracks: types::PlaylistItems(vec![]),
+    })
+    .to_string();
+    println!(
+        "all {} events: {:#?}",
+        eventstr,
+        playlist_store.get_all(eventstr.as_str())
     );
 }

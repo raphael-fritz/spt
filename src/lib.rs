@@ -106,8 +106,8 @@ pub mod types {
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct User {
-        display_name: Option<String>,
-        id: String,
+        pub display_name: Option<String>,
+        pub id: String,
     }
     impl From<model::PublicUser> for User {
         fn from(item: model::PublicUser) -> Self {
