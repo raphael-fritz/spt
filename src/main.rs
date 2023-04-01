@@ -1,84 +1,104 @@
 mod domain;
-mod eventstore;
 mod login;
 mod types;
 
-use eventsourcing::{eventstore::EventStore, Aggregate};
+use eventsourcing::eventstore::EventStore;
+use eventsourcing::Aggregate;
 use rspotify::{model::SimplifiedPlaylist, prelude::*, ClientResult};
+use std::collections::HashSet;
 
 const STORE_PATH: &str = "data.json";
 
 fn main() {
+    // Authenticate with OAuth
     let spotify = match login::login() {
         Ok(spotify) => spotify,
         Err(why) => panic!("Login failed: {why}"),
     };
 
+    // Fetch spotify data
     let user = spotify.current_user().unwrap();
-
     let user_playlists: Vec<ClientResult<SimplifiedPlaylist>> =
         spotify.user_playlists(user.id.clone()).collect();
     let playlist = user_playlists.first().unwrap().as_ref().unwrap();
-    let playlist = types::Playlist::from_id(spotify, playlist.id.clone(), None, None);
 
-    let playlist_store = eventstore::JSONEventStore::from_file(STORE_PATH);
-    let state = domain::PlaylistData {
-        data: types::Playlist {
-            collaborative: false,
-            description: None,
-            followers: 0,
-            id: String::new(),
-            name: String::new(),
-            owner: types::User::new(),
-            public: None,
-            tracks: types::PlaylistItems(vec![]),
-        },
-        generation: 0,
-    };
-    println!("Initial State: {:#?}", state);
+    // Load stored events from file
+    let playlist_store = domain::eventstore::JSONEventStore::from_file(STORE_PATH);
+    let events = playlist_store.all().unwrap();
 
-    let playlistcreation = domain::PlaylistCommand::CreatePlaylist(playlist.unwrap());
-    let create_playlist =
-        domain::PlaylistAggregate::handle_command(&state, &playlistcreation).unwrap();
-    println!("Applied Event: {:#?}", create_playlist[0]);
+    // Rebuild playlist state from events
+    let state = domain::PlaylistData::new();
+    let events: Vec<domain::PlaylistEvent> = events
+        .into_iter()
+        .map(|evt| domain::PlaylistEvent::from(evt))
+        .collect();
+    let state = domain::PlaylistAggregate::apply_all(&state, &events).unwrap();
+    println!("Rebuilt State: {:#?}", state);
 
-    let state = domain::PlaylistAggregate::apply_all(&state, &create_playlist).unwrap();
-    println!("State 1: {:#?}", state);
+    // Build playlist from spotify data
+    let playlist = types::Playlist::from_id(spotify, playlist.id.clone(), None, None).unwrap();
 
-    let store_result = playlist_store
-        .append(create_playlist[0].clone(), "playlists")
-        .unwrap();
-    println!("Store result: {:#?}", store_result);
-    let builtevent = domain::PlaylistEvent::from(store_result);
-    println!("Rebuilt event: {:#?}", builtevent);
+    // compare local and new version and create events if changes occured
+    let mut events: Vec<domain::PlaylistEvent> = Vec::new();
+    if state.data != playlist {
+        // UpdateName Event
+        if state.data.name != playlist.name {
+            let cmd = domain::PlaylistCommand::UpdateName(playlist.name.clone());
+            let evts = domain::PlaylistAggregate::handle_command(&state, &cmd).unwrap();
+            events.extend(evts);
+        }
 
-    let namechange = domain::PlaylistCommand::UpdateName("lol".to_string());
-    let change_name = domain::PlaylistAggregate::handle_command(&state, &namechange).unwrap();
-    println!("Applied Event: {:#?}", change_name[0]);
+        // UpdateDescription Event
+        if state.data.description != playlist.description {
+            let cmd = domain::PlaylistCommand::UpdateDesciption(playlist.description);
+            let evts = domain::PlaylistAggregate::handle_command(&state, &cmd).unwrap();
+            events.extend(evts);
+        }
 
-    let state = domain::PlaylistAggregate::apply_all(&state, &change_name).unwrap();
-    println!("State 2: {:#?}", state);
+        if state.data.tracks != playlist.tracks {
+            let playlist: HashSet<types::PlaylistItem> = playlist.tracks.iter().cloned().collect();
+            let localplaylist: HashSet<types::PlaylistItem> =
+                state.data.tracks.iter().cloned().collect();
 
-    let store_result = playlist_store
-        .append(change_name[0].clone(), "playlists")
-        .unwrap();
-    println!("Store result: {:#?}", store_result);
-    let builtevent = domain::PlaylistEvent::from(store_result);
-    println!("Rebuilt event: {:#?}", builtevent);
+            // AddTracks Event
+            let addedtracks: HashSet<_> = playlist.difference(&localplaylist).collect();
+            if !addedtracks.is_empty() {
+                let cmd =
+                    domain::PlaylistCommand::AddTracks(addedtracks.into_iter().cloned().collect());
+                let evts = domain::PlaylistAggregate::handle_command(&state, &cmd).unwrap();
+                events.extend(evts);
+            }
 
-    let eventstr = domain::PlaylistEvent::UpdatedName(String::new()).to_string();
-    println!(
-        "all {} events: {:#?}",
-        eventstr,
-        playlist_store.get_all(eventstr.as_str())
-    );
+            // RemovedTracks Event
+            let removedtracks: HashSet<_> = localplaylist.difference(&playlist).collect();
+            if !removedtracks.is_empty() {
+                let cmd = domain::PlaylistCommand::RemoveTracks(
+                    removedtracks.into_iter().cloned().collect(),
+                );
+                let evts = domain::PlaylistAggregate::handle_command(&state, &cmd).unwrap();
+                events.extend(evts);
+            }
+        }
+    }
 
-    let eventstr = domain::PlaylistEvent::CreatedPlaylist(types::Playlist::new()).to_string();
-    println!(
-        "all {} events: {:#?}",
-        eventstr,
-        playlist_store.get_all(eventstr.as_str())
-    );
+    if !events.is_empty() {
+        println!("Applying events: {:#?}", events);
 
+        // Calculate new state
+        let _state = domain::PlaylistAggregate::apply_all(&state, &events).unwrap();
+
+        // Save all events
+        for event in events {
+            let store_result = playlist_store.append(event.clone(), "playlists").unwrap();
+            println!("Store result: {:#?}", store_result);
+        }
+    } else {
+        println!(
+            "Playlist {} has not changed since last update!",
+            playlist.name
+        );
+    }
+
+    // Write to disk
     playlist_store.save_events(STORE_PATH);
 }
