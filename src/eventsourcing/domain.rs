@@ -1,44 +1,31 @@
 use super::uevents::UniqueEvent;
-use super::{prelude::*, Aggregate, Result};
+use super::{prelude::*, Aggregate, Dispatcher, Error, Kind, Result};
 use crate::types;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 const DOMAIN_VERSION: &str = "1.0";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum PlaylistEvent {
-    CreatedPlaylist(types::Playlist),
-    UpdatedDesciption(Option<String>),
-    UpdatedName(String),
-    RemovedTracks(types::PlaylistItems),
-    AddedTracks(types::PlaylistItems),
-    DeletedPlaylist(),
-}
-impl fmt::Display for PlaylistEvent {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            PlaylistEvent::CreatedPlaylist(_) => write!(f, "PlaylistEvent.CreatedPlaylist"),
-            PlaylistEvent::UpdatedDesciption(_) => write!(f, "PlaylistEvent.UpdatedDesciption"),
-            PlaylistEvent::UpdatedName(_) => write!(f, "PlaylistEvent.UpdatedName"),
-            PlaylistEvent::AddedTracks(_) => write!(f, "PlaylistEvent.AddedTracks"),
-            PlaylistEvent::RemovedTracks(_) => write!(f, "PlaylistEvent.RemovedTracks"),
-            PlaylistEvent::DeletedPlaylist() => write!(f, "PlaylistEvent.DeletedPlaylist"),
-        }
-    }
+    CreatedPlaylist(String, types::Playlist),
+    UpdatedDesciption(String, Option<String>),
+    UpdatedName(String, String),
+    RemovedTracks(String, types::PlaylistItems),
+    AddedTracks(String, types::PlaylistItems),
+    DeletedPlaylist(String),
 }
 impl Event for PlaylistEvent {
     fn event_type_version(&self) -> &str {
         DOMAIN_VERSION
     }
-    fn event_type(&self) -> &str {
+    fn event_origin_id(&self) -> String {
         match self {
-            PlaylistEvent::CreatedPlaylist(_) => "PlaylistEvent.CreatedPlaylist",
-            PlaylistEvent::UpdatedDesciption(_) => "PlaylistEvent.UpdatedDesciption",
-            PlaylistEvent::AddedTracks(_) => "PlaylistEvent.AddedTracks",
-            PlaylistEvent::RemovedTracks(_) => "PlaylistEvent.RemovedTracks",
-            PlaylistEvent::UpdatedName(_) => "PlaylistEvent.UpdatedName",
-            PlaylistEvent::DeletedPlaylist() => "PlaylistEvent.DeletedPlaylist",
+            PlaylistEvent::CreatedPlaylist(id, _) => id.clone(),
+            PlaylistEvent::UpdatedDesciption(id, _) => id.clone(),
+            PlaylistEvent::UpdatedName(id, _) => id.clone(),
+            PlaylistEvent::AddedTracks(id, _) => id.clone(),
+            PlaylistEvent::RemovedTracks(id, _) => id.clone(),
+            PlaylistEvent::DeletedPlaylist(id) => id.clone(),
         }
     }
 }
@@ -51,12 +38,12 @@ impl From<UniqueEvent> for PlaylistEvent {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum PlaylistCommand {
-    CreatePlaylist(types::Playlist),
-    UpdateDesciption(Option<String>),
-    UpdateName(String),
-    AddTracks(types::PlaylistItems),
-    RemoveTracks(types::PlaylistItems),
-    DeletePlaylist(),
+    CreatePlaylist(String, types::Playlist),
+    UpdateDesciption(String, Option<String>),
+    UpdateName(String, String),
+    AddTracks(String, types::PlaylistItems),
+    RemoveTracks(String, types::PlaylistItems),
+    DeletePlaylist(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,11 +72,11 @@ impl Aggregate for PlaylistAggregate {
 
     fn apply_event(state: &Self::State, evt: &Self::Event) -> Result<Self::State> {
         let state = match &*evt {
-            PlaylistEvent::CreatedPlaylist(playlist) => PlaylistData {
+            PlaylistEvent::CreatedPlaylist(_id, playlist) => PlaylistData {
                 data: playlist.to_owned(),
                 generation: state.generation + 1,
             },
-            PlaylistEvent::UpdatedName(newname) => PlaylistData {
+            PlaylistEvent::UpdatedName(_id, newname) => PlaylistData {
                 data: types::Playlist {
                     collaborative: state.data.collaborative,
                     followers: state.data.followers,
@@ -102,7 +89,7 @@ impl Aggregate for PlaylistAggregate {
                 },
                 generation: state.generation + 1,
             },
-            PlaylistEvent::UpdatedDesciption(newdes) => PlaylistData {
+            PlaylistEvent::UpdatedDesciption(_id, newdes) => PlaylistData {
                 data: types::Playlist {
                     collaborative: state.data.collaborative,
                     followers: state.data.followers,
@@ -115,7 +102,7 @@ impl Aggregate for PlaylistAggregate {
                 },
                 generation: state.generation + 1,
             },
-            PlaylistEvent::AddedTracks(tracks) => {
+            PlaylistEvent::AddedTracks(_id, tracks) => {
                 let mut ntracks = state.data.tracks.clone();
                 ntracks.0.append(&mut tracks.0.clone());
                 PlaylistData {
@@ -132,7 +119,7 @@ impl Aggregate for PlaylistAggregate {
                     generation: state.generation + 1,
                 }
             }
-            PlaylistEvent::RemovedTracks(tracks) => {
+            PlaylistEvent::RemovedTracks(_id, tracks) => {
                 let mut ntracks = state.data.tracks.clone();
                 for track in tracks.0.clone() {
                     ntracks.0.retain(|x| *x != track);
@@ -151,33 +138,83 @@ impl Aggregate for PlaylistAggregate {
                     generation: state.generation + 1,
                 }
             }
-            PlaylistEvent::DeletedPlaylist() => todo!(),
+            PlaylistEvent::DeletedPlaylist(_) => todo!(),
         };
         Ok(state)
     }
-    fn handle_command(_state: &Self::State, cmd: &Self::Command) -> Result<Vec<Self::Event>> {
+    fn handle_command(state: &Self::State, cmd: &Self::Command) -> Result<Vec<Self::Event>> {
         // SHOULD DO: validate state and command
-        // if validation passes...
+
+        // Check that command id matches state id
+        // This doesn't apply for the CreatedPlaylist variant
+        if let PlaylistCommand::AddTracks(id, _)
+        | PlaylistCommand::DeletePlaylist(id)
+        | PlaylistCommand::RemoveTracks(id, _)
+        | PlaylistCommand::UpdateDesciption(id, _)
+        | PlaylistCommand::UpdateName(id, _) = cmd
+        {
+            if id.clone() != state.data.id {
+                return Err(Error {
+                    kind: Kind::CommandFailure("Mismatched id!".to_string()),
+                });
+            }
+        };
+
         let evts = match cmd {
-            PlaylistCommand::CreatePlaylist(playlist) => {
-                vec![PlaylistEvent::CreatedPlaylist(playlist.to_owned())]
+            PlaylistCommand::CreatePlaylist(id, playlist) => {
+                vec![PlaylistEvent::CreatedPlaylist(
+                    id.to_owned(),
+                    playlist.to_owned(),
+                )]
             }
-            PlaylistCommand::UpdateName(newname) => {
-                vec![PlaylistEvent::UpdatedName(newname.to_owned())]
+            PlaylistCommand::UpdateName(id, newname) => {
+                vec![PlaylistEvent::UpdatedName(
+                    id.to_owned(),
+                    newname.to_owned(),
+                )]
             }
-            PlaylistCommand::UpdateDesciption(newdes) => {
-                vec![PlaylistEvent::UpdatedDesciption(newdes.to_owned())]
+            PlaylistCommand::UpdateDesciption(id, newdes) => {
+                vec![PlaylistEvent::UpdatedDesciption(
+                    id.to_owned(),
+                    newdes.to_owned(),
+                )]
             }
-            PlaylistCommand::AddTracks(tracks) => {
-                vec![PlaylistEvent::AddedTracks(tracks.to_owned())]
+            PlaylistCommand::AddTracks(id, tracks) => {
+                vec![PlaylistEvent::AddedTracks(id.to_owned(), tracks.to_owned())]
             }
-            PlaylistCommand::RemoveTracks(tracks) => {
-                vec![PlaylistEvent::RemovedTracks(tracks.to_owned())]
+            PlaylistCommand::RemoveTracks(id, tracks) => {
+                vec![PlaylistEvent::RemovedTracks(
+                    id.to_owned(),
+                    tracks.to_owned(),
+                )]
             }
-            PlaylistCommand::DeletePlaylist() => {
-                vec![PlaylistEvent::DeletedPlaylist()]
+            PlaylistCommand::DeletePlaylist(id) => {
+                vec![PlaylistEvent::DeletedPlaylist(id.to_owned())]
             }
         };
         Ok(evts)
+    }
+}
+
+pub struct PlaylistDispatcher;
+impl Dispatcher for PlaylistDispatcher {
+    type Event = PlaylistEvent;
+    type State = PlaylistData;
+    type Command = PlaylistCommand;
+    type Aggregate = PlaylistAggregate;
+
+    fn dispatch(
+        state: &Self::State,
+        cmd: &Self::Command,
+        store: &impl EventStore,
+        stream: &str,
+    ) -> Vec<Result<UniqueEvent>> {
+        match Self::Aggregate::handle_command(state, cmd) {
+            Ok(evts) => evts
+                .into_iter()
+                .map(|evt| store.append(evt, stream))
+                .collect(),
+            Err(e) => vec![Err(e)],
+        }
     }
 }
