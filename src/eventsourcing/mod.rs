@@ -159,12 +159,10 @@ pub enum Kind {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// All events must be serializable, and they need to expose some basic metadata
-/// about the event, including the type name, the type version, and a source
-/// to be used when events are emitted. If you use the derive macro fror events,
-/// you do not have to implement these functions manually.
+/// about the event, namely the event version and the originator id
 pub trait Event: Serialize {
     fn event_type_version(&self) -> &str;
-    fn event_type(&self) -> &str;
+    fn event_origin_id(&self) -> String;
 }
 
 /// Aggregate state only requires that it expose the generation number. State generation

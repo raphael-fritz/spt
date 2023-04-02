@@ -6,12 +6,12 @@
 
 use super::Event;
 use super::Result;
-use chrono::prelude::*;
 use serde_json;
 use std::fs::File;
 use std::io::BufRead;
 //use std::io::BufReader;
 use super::uevents::UniqueEvent;
+use chrono::{DateTime, Utc};
 use std::io;
 use std::io::Write;
 use std::path::Path;
@@ -32,6 +32,11 @@ impl JSONEventStore {
         JSONEventStore {
             evts: Mutex::new(Vec::<UniqueEvent>::new()),
         }
+    }
+
+    pub fn len(&self) -> usize {
+        let guard = self.evts.lock().unwrap();
+        guard.len()
     }
 
     pub fn from_file<P: AsRef<Path> + ?Sized + std::convert::AsRef<std::ffi::OsStr>>(
@@ -79,46 +84,46 @@ impl EventStore for JSONEventStore {
 
 #[allow(dead_code)]
 impl JSONEventStore {
-    pub fn all(&self) -> Result<Vec<UniqueEvent>> {
-        let guard = self.evts.lock().unwrap();
-        let matches = guard.iter().cloned().collect();
-        Ok(matches)
-    }
-
-    pub fn get_all(&self, event_type: &str) -> Result<Vec<UniqueEvent>> {
-        let guard = self.evts.lock().unwrap();
-        let matches = guard
-            .iter()
-            .filter(|evt| evt.event_type == event_type)
-            .cloned()
-            .collect();
-
-        Ok(matches)
-    }
-
-    pub fn get_from(&self, event_type: &str, start: DateTime<Utc>) -> Result<Vec<UniqueEvent>> {
-        let guard = self.evts.lock().unwrap();
-        let matches = guard
-            .iter()
-            .filter(|evt| evt.event_type == event_type && evt.event_time >= start)
-            .cloned()
-            .collect();
-        Ok(matches)
-    }
-
-    pub fn get_range(
+    pub fn get_all<E: Event + std::convert::From<UniqueEvent>>(
         &self,
-        event_type: &str,
+        id: String,
+    ) -> Result<Vec<E>> {
+        let guard = self.evts.lock().unwrap();
+        let matches = guard
+            .iter()
+            .map(|evt| evt.clone().into())
+            .filter(|evt: &E| evt.event_origin_id() == id)
+            .collect();
+        Ok(matches)
+    }
+
+    pub fn get_from<E: Event + std::convert::From<UniqueEvent>>(
+        &self,
+        id: String,
+        start: DateTime<Utc>,
+    ) -> Result<Vec<E>> {
+        let guard = self.evts.lock().unwrap();
+        let matches = guard
+            .iter()
+            .filter(|evt| evt.event_time >= start)
+            .map(|evt| evt.clone().into())
+            .filter(|evt: &E| evt.event_origin_id() == id)
+            .collect();
+        Ok(matches)
+    }
+
+    pub fn get_range<E: Event + std::convert::From<UniqueEvent>>(
+        &self,
+        id: String,
         start: DateTime<Utc>,
         end: DateTime<Utc>,
-    ) -> Result<Vec<UniqueEvent>> {
+    ) -> Result<Vec<E>> {
         let guard = self.evts.lock().unwrap();
         let matches = guard
             .iter()
-            .filter(|evt| {
-                evt.event_type == event_type && evt.event_time >= start && evt.event_time <= end
-            })
-            .cloned()
+            .filter(|evt| evt.event_time >= start && evt.event_time <= end)
+            .map(|evt| evt.clone().into())
+            .filter(|evt: &E| evt.event_origin_id() == id)
             .collect();
         Ok(matches)
     }
