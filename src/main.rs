@@ -1,14 +1,13 @@
-mod domain;
+mod eventsourcing;
 mod login;
 mod types;
 
-use eventsourcing::eventstore::EventStore;
-use eventsourcing::Aggregate;
+use crate::eventsourcing::domain;
+use crate::eventsourcing::eventstore::JSONEventStore;
+use crate::eventsourcing::prelude::*;
 use rspotify::{model::SimplifiedPlaylist, prelude::*, ClientResult};
 use std::collections::HashSet;
 use std::fmt::Write;
-
-use crate::domain::PlaylistData;
 
 const DATA_DIR: &str = "data";
 
@@ -32,7 +31,7 @@ fn main() {
         let id = id.split(":").last().unwrap();
         let mut store_path = String::new();
         write!(store_path, "{}/{}.json", DATA_DIR, id).unwrap();
-        let playlist_store = domain::eventstore::JSONEventStore::from_file(&store_path);
+        let playlist_store = JSONEventStore::from_file(&store_path);
         let events = playlist_store.all().unwrap();
 
         // Rebuild playlist state from events
@@ -42,7 +41,7 @@ fn main() {
             .map(|evt| domain::PlaylistEvent::from(evt))
             .collect();
         let state = domain::PlaylistAggregate::apply_all(&state, &events).unwrap();
-        if state != PlaylistData::new() {
+        if state != domain::PlaylistData::new() {
             println!(
                 "Rebuilt playlist {} ( {} ) from memory",
                 state.data.name, state.data.id
