@@ -220,18 +220,24 @@ pub mod eventstore {
             }
         }
 
-        pub fn from_file<P: AsRef<Path> + ?Sized>(path: &P) -> JSONEventStore {
-            let file = File::open(path).unwrap();
-            let lines = io::BufReader::new(file).lines();
-            let mut events = Vec::<CloudEvent>::new();
-            for line in lines {
-                let line = line.unwrap();
-                let event: CloudEvent = serde_json::from_str(&line).unwrap();
-                events.push(event);
-            }
+        pub fn from_file<P: AsRef<Path> + ?Sized + std::convert::AsRef<std::ffi::OsStr>>(
+            path: &P,
+        ) -> JSONEventStore {
+            if Path::new(path).exists() {
+                let file = File::open(path).unwrap();
+                let lines = io::BufReader::new(file).lines();
+                let mut events = Vec::<CloudEvent>::new();
+                for line in lines {
+                    let line = line.unwrap();
+                    let event: CloudEvent = serde_json::from_str(&line).unwrap();
+                    events.push(event);
+                }
 
-            JSONEventStore {
-                evts: Mutex::new(events),
+                JSONEventStore {
+                    evts: Mutex::new(events),
+                }
+            } else {
+                Self::new()
             }
         }
 

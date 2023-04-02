@@ -195,7 +195,7 @@ impl From<model::FullPlaylist> for Playlist {
 
 impl Playlist {
     pub fn from_id(
-        client: rspotify::AuthCodeSpotify,
+        client: &rspotify::AuthCodeSpotify,
         playlist_id: model::PlaylistId,
         fields: Option<&str>,
         market: Option<rspotify::model::Market>,
