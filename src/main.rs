@@ -328,6 +328,7 @@ fn compare(state: &domain::PlaylistData, playlist: &types::Playlist) -> Vec<doma
                 println!("Added tracks to {} ( {} ) ", state.data.name, state.data.id);
                 let cmd = domain::PlaylistCommand::AddTracks(
                     playlist.id.clone(),
+                    playlist.snapshot_id.clone(),
                     addedtracks.into_iter().cloned().collect(),
                 );
                 let evts = domain::PlaylistAggregate::handle_command(&state, &cmd).unwrap();
@@ -343,6 +344,7 @@ fn compare(state: &domain::PlaylistData, playlist: &types::Playlist) -> Vec<doma
                 );
                 let cmd = domain::PlaylistCommand::RemoveTracks(
                     playlist.id.clone(),
+                    playlist.snapshot_id.clone(),
                     removedtracks.into_iter().cloned().collect(),
                 );
                 let evts = domain::PlaylistAggregate::handle_command(&state, &cmd).unwrap();

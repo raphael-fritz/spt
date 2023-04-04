@@ -10,8 +10,8 @@ pub enum PlaylistEvent {
     CreatedPlaylist(String, types::Playlist),
     UpdatedDesciption(String, Option<String>),
     UpdatedName(String, String),
-    RemovedTracks(String, types::PlaylistItems),
-    AddedTracks(String, types::PlaylistItems),
+    RemovedTracks(String, String, types::PlaylistItems),
+    AddedTracks(String, String, types::PlaylistItems),
     DeletedPlaylist(String),
 }
 impl Event for PlaylistEvent {
@@ -23,8 +23,8 @@ impl Event for PlaylistEvent {
             PlaylistEvent::CreatedPlaylist(id, _) => id.clone(),
             PlaylistEvent::UpdatedDesciption(id, _) => id.clone(),
             PlaylistEvent::UpdatedName(id, _) => id.clone(),
-            PlaylistEvent::AddedTracks(id, _) => id.clone(),
-            PlaylistEvent::RemovedTracks(id, _) => id.clone(),
+            PlaylistEvent::AddedTracks(id, _, _) => id.clone(),
+            PlaylistEvent::RemovedTracks(id, _, _) => id.clone(),
             PlaylistEvent::DeletedPlaylist(id) => id.clone(),
         }
     }
@@ -41,8 +41,8 @@ pub enum PlaylistCommand {
     CreatePlaylist(String, types::Playlist),
     UpdateDesciption(String, Option<String>),
     UpdateName(String, String),
-    AddTracks(String, types::PlaylistItems),
-    RemoveTracks(String, types::PlaylistItems),
+    AddTracks(String, String, types::PlaylistItems),
+    RemoveTracks(String, String, types::PlaylistItems),
     DeletePlaylist(String),
 }
 
@@ -86,6 +86,7 @@ impl Aggregate for PlaylistAggregate {
                     name: newname.to_owned(),
                     owner: state.data.owner.clone(),
                     tracks: state.data.tracks.clone(),
+                    snapshot_id: state.data.snapshot_id.clone(),
                 },
                 generation: state.generation + 1,
             },
@@ -99,10 +100,11 @@ impl Aggregate for PlaylistAggregate {
                     name: state.data.name.clone(),
                     owner: state.data.owner.clone(),
                     tracks: state.data.tracks.clone(),
+                    snapshot_id: state.data.snapshot_id.clone(),
                 },
                 generation: state.generation + 1,
             },
-            PlaylistEvent::AddedTracks(_id, tracks) => {
+            PlaylistEvent::AddedTracks(_id, snapshot, tracks) => {
                 let mut ntracks = state.data.tracks.clone();
                 ntracks.0.append(&mut tracks.0.clone());
                 PlaylistData {
@@ -115,11 +117,12 @@ impl Aggregate for PlaylistAggregate {
                         name: state.data.name.clone(),
                         owner: state.data.owner.clone(),
                         tracks: ntracks,
+                        snapshot_id: snapshot.clone(),
                     },
                     generation: state.generation + 1,
                 }
             }
-            PlaylistEvent::RemovedTracks(_id, tracks) => {
+            PlaylistEvent::RemovedTracks(_id, snapshot, tracks) => {
                 let mut ntracks = state.data.tracks.clone();
                 for track in tracks.0.clone() {
                     ntracks.0.retain(|x| *x != track);
@@ -134,6 +137,7 @@ impl Aggregate for PlaylistAggregate {
                         name: state.data.name.clone(),
                         owner: state.data.owner.clone(),
                         tracks: ntracks,
+                        snapshot_id: snapshot.clone(),
                     },
                     generation: state.generation + 1,
                 }
@@ -147,9 +151,9 @@ impl Aggregate for PlaylistAggregate {
 
         // Check that command id matches state id
         // This doesn't apply for the CreatedPlaylist variant
-        if let PlaylistCommand::AddTracks(id, _)
+        if let PlaylistCommand::AddTracks(id, _, _)
         | PlaylistCommand::DeletePlaylist(id)
-        | PlaylistCommand::RemoveTracks(id, _)
+        | PlaylistCommand::RemoveTracks(id, _, _)
         | PlaylistCommand::UpdateDesciption(id, _)
         | PlaylistCommand::UpdateName(id, _) = cmd
         {
@@ -179,12 +183,17 @@ impl Aggregate for PlaylistAggregate {
                     newdes.to_owned(),
                 )]
             }
-            PlaylistCommand::AddTracks(id, tracks) => {
-                vec![PlaylistEvent::AddedTracks(id.to_owned(), tracks.to_owned())]
+            PlaylistCommand::AddTracks(id, snapshot_id, tracks) => {
+                vec![PlaylistEvent::AddedTracks(
+                    id.to_owned(),
+                    snapshot_id.to_owned(),
+                    tracks.to_owned(),
+                )]
             }
-            PlaylistCommand::RemoveTracks(id, tracks) => {
+            PlaylistCommand::RemoveTracks(id, snapshot_id, tracks) => {
                 vec![PlaylistEvent::RemovedTracks(
                     id.to_owned(),
+                    snapshot_id.to_owned(),
                     tracks.to_owned(),
                 )]
             }

@@ -177,6 +177,7 @@ pub struct Playlist {
     pub owner: User,
     pub public: Option<bool>,
     pub tracks: PlaylistItems,
+    pub snapshot_id: String,
 }
 impl From<model::FullPlaylist> for Playlist {
     fn from(item: model::FullPlaylist) -> Self {
@@ -189,6 +190,7 @@ impl From<model::FullPlaylist> for Playlist {
             owner: User::from(item.owner),
             public: item.public,
             tracks: PlaylistItems(vec![]),
+            snapshot_id: item.snapshot_id,
         }
     }
 }
@@ -220,6 +222,7 @@ impl Playlist {
             owner: User::new(),
             public: None,
             tracks: PlaylistItems(vec![]),
+            snapshot_id: String::new(),
         }
     }
 }
