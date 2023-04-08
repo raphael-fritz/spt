@@ -5,7 +5,7 @@ Track a Spotify playlist on a regular basis with an model powered by event sourc
 ## To-do
 
 - [ ] Only track playlists owned by the user
-- [ ] Compare playlist snapshot id before comparing all tracks
+- [x] Compare playlist snapshot id before comparing all tracks
 - [ ] Handle errors (especially in Playlist.from_id)
 
 ## Useful links

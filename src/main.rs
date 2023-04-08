@@ -67,7 +67,10 @@ fn main() {
 
     for user in users {
         // Fetch user playlists
-        println!("Fetching data for {:?} ( {} )", user.display_name, user.id);
+        println!(
+            "\nFetching data for {:?} ( {} )",
+            user.display_name, user.id
+        );
         let before = Instant::now();
         let user_playlists: Vec<ClientResult<model::SimplifiedPlaylist>> = spotify
             .user_playlists(model::UserId::from_id_or_uri(&user.id).unwrap())
@@ -95,24 +98,22 @@ fn main() {
 
         // Build playlists from spotify data
         let before = Instant::now();
-        let playlists: Vec<types::Playlist> = user_playlists
+        let playlists: Vec<model::FullPlaylist> = user_playlists
             .iter()
             .map(|res| res.as_ref().unwrap())
-            .map(|playlist| {
-                types::Playlist::from_id(&spotify, playlist.id.clone(), None, None).unwrap()
-            })
+            .map(|pl| spotify.playlist(pl.id.clone(), None, None).unwrap())
             .collect();
         println!(
             "Built {} playlists from spotify data in {:.2?}",
             playlists.len(),
             before.elapsed()
         );
-        dbg!(&playlists[0].snapshot_id);
-        let data = playlists.iter().zip(localplaylists.iter());
 
+        // Compare Playlists
+        let before = Instant::now();
+        let data = playlists.iter().zip(localplaylists.iter());
         for (playlist, local) in data {
-            //let before = Instant::now();
-            let plevent = spt::compare(&local, &playlist);
+            let plevent = spt::compare(&spotify, &local, &playlist, None, None);
             if !plevent.is_empty() {
                 // Calculate new state
                 let _state = domain::PlaylistAggregate::apply_all(&local, &plevent).unwrap();
