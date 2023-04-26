@@ -1,4 +1,4 @@
-use rspotify::{model, prelude::*, ClientResult};
+use rspotify::{model, prelude::*};
 use spt::eventsourcing::domain;
 use spt::eventsourcing::eventstore::JSONEventStore;
 use spt::eventsourcing::prelude::*;
@@ -72,9 +72,17 @@ fn main() {
             user.display_name, user.id
         );
         let before = Instant::now();
-        let user_playlists: Vec<ClientResult<model::SimplifiedPlaylist>> = spotify
+        let user_playlists: Vec<model::SimplifiedPlaylist> = spotify
             .user_playlists(model::UserId::from_id_or_uri(&user.id).unwrap())
+            .map(|res| res.unwrap())
             .collect();
+
+        // filter out all playlists not owned by the user (e.g. the Daily Mix etc.)
+        let user_playlists: Vec<model::SimplifiedPlaylist> = user_playlists
+            .into_iter()
+            .filter(|pl| pl.owner.id.to_string() == user.id)
+            .collect();
+
         println!(
             "Fetched {} playlists from {:?} ( {} ) in {:.2?}",
             user_playlists.len(),
@@ -87,7 +95,6 @@ fn main() {
         let before = Instant::now();
         let localplaylists: Vec<domain::PlaylistData> = user_playlists
             .iter()
-            .map(|res| res.as_ref().unwrap())
             .map(|pl| spt::build_local(&pl.id.to_string(), &event_store))
             .collect();
         println!(
@@ -100,7 +107,6 @@ fn main() {
         let before = Instant::now();
         let playlists: Vec<model::FullPlaylist> = user_playlists
             .iter()
-            .map(|res| res.as_ref().unwrap())
             .map(|pl| spotify.playlist(pl.id.clone(), None, None).unwrap())
             .collect();
         println!(
