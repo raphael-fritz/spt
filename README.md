@@ -2,6 +2,8 @@
 
 Track a Spotify playlist on a regular basis with an model powered by event sourcing!
 
+This application is in very early development and isn't doing much useful stuff yet.
+
 ## To-do
 
 - [x] Only track playlists owned by the user
@@ -18,8 +20,3 @@ Track a Spotify playlist on a regular basis with an model powered by event sourc
 - [Event Sourcing with Aggregates](https://medium.com/capital-one-tech/event-sourcing-with-aggregates-in-rust-4022af41cf67)
 - ["impl trait for vec"](https://github.com/apolitical/impl-display-for-vec)
 - ["Indicatif"](https://docs.rs/indicatif/latest/indicatif/)
-
-## Different event sourcing libraries to consider
-
-- [Thalo](https://github.com/thalo-rs/thalo)
-- [eventually-rs](https://github.com/get-eventually/eventually-rs)
