@@ -42,8 +42,8 @@ pub fn load_users<P: AsRef<Path> + ?Sized + std::convert::AsRef<std::ffi::OsStr>
     let mut users = Vec::<types::User>::new();
 
     for line in lines {
-        let line = line.unwrap();
-        let user: types::User = serde_json::from_str(&line).unwrap();
+        let line = line?;
+        let user: types::User = serde_json::from_str(&line)?;
         users.push(user);
     }
 
@@ -61,17 +61,20 @@ pub fn add_users<P: AsRef<Path> + ?Sized + std::convert::AsRef<std::ffi::OsStr>>
         .append(true)
         .create(true)
         .open(path)?;
-    let user = serde_json::to_string(&user).unwrap();
-    write!(file, "{}\n", user).unwrap();
+    let user = serde_json::to_string(&user)?;
+    write!(file, "{}\n", user)?;
     Ok(())
 }
 
 /// Rebuild playlist state from events
-pub fn build_local(origin_id: &String, pl_store: &JSONEventStore) -> domain::PlaylistData {
-    let events: Vec<domain::PlaylistEvent> = pl_store.get_all(origin_id.to_string()).unwrap();
+pub fn build_local(
+    origin_id: &String,
+    pl_store: &JSONEventStore,
+) -> eventsourcing::Result<domain::PlaylistData> {
+    let events: Vec<domain::PlaylistEvent> = pl_store.get_all(origin_id.to_string());
     let state = domain::PlaylistData::new();
-    let state = domain::PlaylistAggregate::apply_all(&state, &events).unwrap();
-    state
+    let state = domain::PlaylistAggregate::apply_all(&state, &events)?;
+    Ok(state)
 }
 
 /// compare local and new version and return events if changes occured
@@ -81,17 +84,15 @@ pub fn compare(
     playlist: &model::FullPlaylist,
     fields: Option<&str>,
     market: Option<rspotify::model::Market>,
-) -> Vec<domain::PlaylistEvent> {
+) -> Result<Vec<domain::PlaylistEvent>, types::SPTError> {
     let mut plevents: Vec<domain::PlaylistEvent> = Vec::new();
 
     if state.generation == 0 {
         println!("Created {} ( {} )", playlist.name, playlist.id);
-        let playlist =
-            types::Playlist::from_id(&client, playlist.id.clone(), fields, market).unwrap();
+        let playlist = types::Playlist::from_id(&client, playlist.id.clone(), fields, market)?;
         let cmd = domain::PlaylistCommand::CreatePlaylist(playlist.id.clone(), playlist.clone());
-        let evts = domain::PlaylistAggregate::handle_command(&state, &cmd).unwrap();
+        let evts = domain::PlaylistAggregate::handle_command(&state, &cmd)?;
         plevents.extend(evts);
-    //} else if state.data != playlist.clone() {
     } else {
         // Saved my ass already, good assert
         assert!(state.data.id == playlist.id.to_string());
@@ -101,7 +102,7 @@ pub fn compare(
             println!("Updated name for {} ( {} )", state.data.name, state.data.id);
             let cmd =
                 domain::PlaylistCommand::UpdateName(playlist.id.to_string(), playlist.name.clone());
-            let evts = domain::PlaylistAggregate::handle_command(&state, &cmd).unwrap();
+            let evts = domain::PlaylistAggregate::handle_command(&state, &cmd)?;
             plevents.extend(evts);
         }
 
@@ -115,13 +116,12 @@ pub fn compare(
                 playlist.id.to_string(),
                 playlist.description.clone(),
             );
-            let evts = domain::PlaylistAggregate::handle_command(&state, &cmd).unwrap();
+            let evts = domain::PlaylistAggregate::handle_command(&state, &cmd)?;
             plevents.extend(evts);
         }
 
         if state.data.snapshot_id != playlist.snapshot_id {
-            let playlist =
-                types::Playlist::from_id(client, playlist.id.clone(), fields, market).unwrap();
+            let playlist = types::Playlist::from_id(client, playlist.id.clone(), fields, market)?;
             if state.data.tracks != playlist.tracks {
                 let plhash: HashSet<types::PlaylistItem> =
                     playlist.tracks.iter().cloned().collect();
@@ -137,7 +137,7 @@ pub fn compare(
                         playlist.snapshot_id.clone(),
                         addedtracks.into_iter().cloned().collect(),
                     );
-                    let evts = domain::PlaylistAggregate::handle_command(&state, &cmd).unwrap();
+                    let evts = domain::PlaylistAggregate::handle_command(&state, &cmd)?;
                     plevents.extend(evts);
                 }
 
@@ -153,12 +153,12 @@ pub fn compare(
                         playlist.snapshot_id.clone(),
                         removedtracks.into_iter().cloned().collect(),
                     );
-                    let evts = domain::PlaylistAggregate::handle_command(&state, &cmd).unwrap();
+                    let evts = domain::PlaylistAggregate::handle_command(&state, &cmd)?;
                     plevents.extend(evts);
                 }
             }
         }
     }
 
-    return plevents;
+    Ok(plevents)
 }

@@ -30,8 +30,15 @@ impl Event for PlaylistEvent {
     }
 }
 impl From<UniqueEvent> for PlaylistEvent {
+    /// This will panic when the Event can't be converted and should only be used internally where it can be guaranteed that the data is valid
+    /// Convert to a `Result<PlaylistEvent, serde_json::Error>` instead
     fn from(evt: UniqueEvent) -> Self {
-        serde_json::from_value(evt.data).unwrap()
+        serde_json::from_value(evt.data).expect("UniqueEvent is not parseable to an PlaylistEvent")
+    }
+}
+impl From<UniqueEvent> for std::result::Result<PlaylistEvent, serde_json::Error> {
+    fn from(evt: UniqueEvent) -> Self {
+        Ok(serde_json::from_value(evt.data)?)
     }
 }
 

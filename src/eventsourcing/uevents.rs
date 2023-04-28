@@ -20,14 +20,13 @@ where
     E: Event,
 {
     fn from(source: E) -> Self {
-        let raw_data = serde_json::to_string(&source).unwrap();
-
         UniqueEvent {
             event_type_version: source.event_type_version().to_owned(),
             origin_id: source.event_origin_id(),
             event_id: Uuid::new_v4().hyphenated().to_string(),
             event_time: Utc::now(),
-            data: serde_json::from_str(&raw_data).unwrap(),
+            data: serde_json::to_value(&source)
+                .expect("Event implements Serialize so this should never panic."),
         }
     }
 }

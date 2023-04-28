@@ -41,34 +41,34 @@ impl JSONEventStore {
 
     pub fn from_file<P: AsRef<Path> + ?Sized + std::convert::AsRef<std::ffi::OsStr>>(
         path: &P,
-    ) -> JSONEventStore {
-        if Path::new(path).exists() {
-            let file = File::open(path).unwrap();
-            let lines = io::BufReader::new(file).lines();
-            let mut events = Vec::<UniqueEvent>::new();
-            for line in lines {
-                let line = line.unwrap();
-                let event: UniqueEvent = serde_json::from_str(&line).unwrap();
-                events.push(event);
-            }
-
-            JSONEventStore {
-                evts: Mutex::new(events),
-            }
-        } else {
-            Self::new()
+    ) -> std::result::Result<JSONEventStore, crate::types::SPTError> {
+        let file = File::open(path)?;
+        let lines = io::BufReader::new(file).lines();
+        let mut events = Vec::<UniqueEvent>::new();
+        for line in lines {
+            let line = line?;
+            let event: UniqueEvent = serde_json::from_str(&line)?;
+            events.push(event);
         }
+
+        Ok(JSONEventStore {
+            evts: Mutex::new(events),
+        })
     }
 
-    pub fn save_events<P: AsRef<Path> + ?Sized>(&self, path: &P) {
+    pub fn save_events<P: AsRef<Path> + ?Sized>(
+        &self,
+        path: &P,
+    ) -> std::result::Result<(), crate::types::SPTError> {
         let guard = self.evts.lock().unwrap();
         let events: Vec<UniqueEvent> = guard.iter().cloned().collect();
-        let file = File::create(path).unwrap();
+        let file = File::create(path)?;
         let mut file = io::BufWriter::new(file);
         for event in events {
-            let event = serde_json::to_string(&event).unwrap();
-            write!(file, "{}\n", event).unwrap();
+            let event = serde_json::to_string(&event)?;
+            write!(file, "{}\n", event)?;
         }
+        Ok(())
     }
 }
 
@@ -84,17 +84,14 @@ impl EventStore for JSONEventStore {
 
 #[allow(dead_code)]
 impl JSONEventStore {
-    pub fn get_all<E: Event + std::convert::From<UniqueEvent>>(
-        &self,
-        id: String,
-    ) -> Result<Vec<E>> {
+    pub fn get_all<E: Event + std::convert::From<UniqueEvent>>(&self, id: String) -> Vec<E> {
         let guard = self.evts.lock().unwrap();
         let matches = guard
             .iter()
             .map(|evt| evt.clone().into())
             .filter(|evt: &E| evt.event_origin_id() == id)
             .collect();
-        Ok(matches)
+        matches
     }
 
     pub fn get_from<E: Event + std::convert::From<UniqueEvent>>(

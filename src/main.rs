@@ -20,35 +20,64 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
     let config = spt::Commands::build_local(&args);
-    let config = config.unwrap();
+    let config = match config {
+        Ok(config) => config,
+        Err(err) => {
+            eprintln!("{}", err);
+            std::process::exit(1)
+        }
+    };
 
     // Authenticate with OAuth
     let spotify = match login::login() {
         Ok(spotify) => spotify,
-        Err(why) => panic!("Login failed: {why}"),
+        Err(why) => {
+            eprintln!("Login failed: {why}");
+            std::process::exit(1)
+        }
     };
 
     // Load Users
     let before = Instant::now();
-    let users = spt::load_users(USER_FILE).unwrap();
-    println!(
-        "Loaded {} user from {} in {:.2?}",
-        users.len(),
-        USER_FILE,
-        before.elapsed()
-    );
+    let users = match spt::load_users(USER_FILE) {
+        Ok(users) => {
+            println!(
+                "Loaded {} users from {} in {:.2?}",
+                users.len(),
+                USER_FILE,
+                before.elapsed()
+            );
+            users
+        }
+        Err(err) => {
+            eprintln!("Failed to load users from {}: {}", USER_FILE, err);
+            std::process::exit(1)
+        }
+    };
 
     // Load stored events from file
     let before = Instant::now();
     let mut store_path = String::new();
     write!(store_path, "{}/{}.json", DATA_DIR, DATA_FILE).unwrap();
     let event_store = JSONEventStore::from_file(&store_path);
-    println!(
-        "Loaded {} events from {} in {:.2?}",
-        event_store.len(),
-        store_path,
-        before.elapsed()
-    );
+    let event_store = match event_store {
+        Ok(store) => {
+            println!(
+                "Loaded {} events from {} in {:.2?}",
+                store.len(),
+                store_path,
+                before.elapsed()
+            );
+            store
+        }
+        Err(err) => {
+            println!(
+                "Failed to create eventstore from {}: {}\nUsing new one instead...",
+                store_path, err
+            );
+            JSONEventStore::new()
+        }
+    };
 
     let users: Vec<types::User> = match config {
         Commands::SINGLE => users[0..1].to_vec(),
@@ -95,7 +124,7 @@ fn main() {
         let before = Instant::now();
         let localplaylists: Vec<domain::PlaylistData> = user_playlists
             .iter()
-            .map(|pl| spt::build_local(&pl.id.to_string(), &event_store))
+            .map(|pl| spt::build_local(&pl.id.to_string(), &event_store).unwrap())
             .collect();
         println!(
             "Rebuilt {} playlists from memory in {:.2?}",
@@ -119,7 +148,7 @@ fn main() {
         let before = Instant::now();
         let data = playlists.iter().zip(localplaylists.iter());
         for (playlist, local) in data {
-            let plevent = spt::compare(&spotify, &local, &playlist, None, None);
+            let plevent = spt::compare(&spotify, &local, &playlist, None, None).unwrap();
             if !plevent.is_empty() {
                 // Calculate new state
                 let _state = domain::PlaylistAggregate::apply_all(&local, &plevent).unwrap();
@@ -139,11 +168,14 @@ fn main() {
 
     // Write to disk
     let before = Instant::now();
-    event_store.save_events(&store_path);
-    println!(
-        "Saved all events to {} in {:.2?}",
-        store_path,
-        before.elapsed()
-    );
+    match event_store.save_events(&store_path) {
+        Ok(_) => println!(
+            "Saved all events to {} in {:.2?}",
+            store_path,
+            before.elapsed()
+        ),
+        Err(err) => println!("Failed to save events to {}: {}", store_path, err),
+    }
+
     println!("\nFinished in {:.2?}\n", runtime.elapsed());
 }

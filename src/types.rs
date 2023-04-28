@@ -1,7 +1,59 @@
 use chrono::prelude::{DateTime, Utc};
 use rspotify::{model, prelude::BaseClient, ClientResult};
 use serde::{Deserialize, Serialize};
-use std::ops;
+
+#[derive(Debug)]
+pub enum SPTError {
+    Authentication(crate::login::AuthenticationError),
+    Parse(serde_json::Error),
+    Client(rspotify::ClientError),
+    IO(std::io::Error),
+    EventSourcing(crate::eventsourcing::Error),
+}
+
+impl std::fmt::Display for SPTError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            SPTError::IO(err) => write!(f, "{}", err),
+            SPTError::Parse(err) => write!(f, "{}", err),
+            SPTError::Client(err) => write!(f, "{}", err),
+            SPTError::Authentication(err) => write!(f, "{}", err),
+            SPTError::EventSourcing(err) => write!(f, "{}", err),
+        }
+    }
+}
+
+impl From<crate::login::AuthenticationError> for SPTError {
+    fn from(err: crate::login::AuthenticationError) -> Self {
+        SPTError::Authentication(err)
+    }
+}
+
+impl From<std::io::Error> for SPTError {
+    fn from(err: std::io::Error) -> Self {
+        SPTError::IO(err)
+    }
+}
+
+impl From<serde_json::Error> for SPTError {
+    fn from(err: serde_json::Error) -> Self {
+        SPTError::Parse(err)
+    }
+}
+
+impl From<rspotify::ClientError> for SPTError {
+    fn from(err: rspotify::ClientError) -> Self {
+        SPTError::Client(err)
+    }
+}
+
+impl From<crate::eventsourcing::Error> for SPTError {
+    fn from(err: crate::eventsourcing::Error) -> Self {
+        SPTError::EventSourcing(err)
+    }
+}
+
+impl std::error::Error for SPTError {}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct User {
@@ -144,19 +196,18 @@ impl From<model::PlaylistItem> for PlaylistItem {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PlaylistItems(pub Vec<PlaylistItem>);
-impl ops::Deref for PlaylistItems {
+impl std::ops::Deref for PlaylistItems {
     type Target = Vec<PlaylistItem>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
-impl From<Vec<ClientResult<model::PlaylistItem>>> for PlaylistItems {
-    fn from(items: Vec<ClientResult<model::PlaylistItem>>) -> Self {
+impl From<Vec<model::PlaylistItem>> for PlaylistItems {
+    fn from(items: Vec<model::PlaylistItem>) -> Self {
         PlaylistItems(
             items
                 .into_iter()
-                .map(|res| res.unwrap())
                 .map(|item| PlaylistItem::from(item))
                 .collect(),
         )
@@ -206,8 +257,9 @@ impl Playlist {
         let tracks: Vec<ClientResult<rspotify::model::PlaylistItem>> = client
             .playlist_items(playlist.id.clone(), fields, market)
             .collect();
+        let tracks: ClientResult<Vec<model::PlaylistItem>> = tracks.into_iter().collect();
         let mut playlist = Playlist::from(playlist);
-        playlist.tracks = PlaylistItems::from(tracks);
+        playlist.tracks = PlaylistItems::from(tracks?);
         return Ok(playlist);
     }
 
