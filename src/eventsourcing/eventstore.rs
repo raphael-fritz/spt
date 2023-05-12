@@ -43,13 +43,8 @@ impl JSONEventStore {
         path: &P,
     ) -> std::result::Result<JSONEventStore, crate::types::SPTError> {
         let file = File::open(path)?;
-        let lines = io::BufReader::new(file).lines();
-        let mut events = Vec::<UniqueEvent>::new();
-        for line in lines {
-            let line = line?;
-            let event: UniqueEvent = serde_json::from_str(&line)?;
-            events.push(event);
-        }
+        let file = io::BufReader::new(file);
+        let events: Vec<UniqueEvent> = serde_json::from_reader(file)?;
 
         Ok(JSONEventStore {
             evts: Mutex::new(events),
@@ -63,11 +58,9 @@ impl JSONEventStore {
         let guard = self.evts.lock().unwrap();
         let events: Vec<UniqueEvent> = guard.iter().cloned().collect();
         let file = File::create(path)?;
-        let mut file = io::BufWriter::new(file);
-        for event in events {
-            let event = serde_json::to_string(&event)?;
-            write!(file, "{}\n", event)?;
-        }
+        let file = io::BufWriter::new(file);
+        serde_json::to_writer(file, &events)?;
+
         Ok(())
     }
 }
