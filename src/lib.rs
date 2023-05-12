@@ -81,7 +81,7 @@ pub fn build_local(
 pub fn compare(
     client: &AuthCodeSpotify,
     state: &domain::PlaylistData,
-    playlist: &model::FullPlaylist,
+    playlist: &model::SimplifiedPlaylist,
     fields: Option<&str>,
     market: Option<rspotify::model::Market>,
 ) -> Result<Vec<domain::PlaylistEvent>, types::SPTError> {
@@ -106,22 +106,23 @@ pub fn compare(
             plevents.extend(evts);
         }
 
-        // UpdateDescription Event
-        if state.data.description != playlist.description {
-            println!(
-                "Updated description for {} ( {} )",
-                state.data.name, state.data.id
-            );
-            let cmd = domain::PlaylistCommand::UpdateDesciption(
-                playlist.id.to_string(),
-                playlist.description.clone(),
-            );
-            let evts = domain::PlaylistAggregate::handle_command(&state, &cmd)?;
-            plevents.extend(evts);
-        }
-
         if state.data.snapshot_id != playlist.snapshot_id {
             let playlist = types::Playlist::from_id(client, playlist.id.clone(), fields, market)?;
+
+            // UpdateDescription Event
+            if state.data.description != playlist.description {
+                println!(
+                    "Updated description for {} ( {} )",
+                    state.data.name, state.data.id
+                );
+                let cmd = domain::PlaylistCommand::UpdateDesciption(
+                    playlist.id.to_string(),
+                    playlist.description.clone(),
+                );
+                let evts = domain::PlaylistAggregate::handle_command(&state, &cmd)?;
+                plevents.extend(evts);
+            }
+
             if state.data.tracks != playlist.tracks {
                 let plhash: HashSet<types::PlaylistItem> =
                     playlist.tracks.iter().cloned().collect();

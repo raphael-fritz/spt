@@ -132,10 +132,7 @@ fn main() {
 
         // Build playlists from spotify data
         let before = Instant::now();
-        let playlists: Vec<model::FullPlaylist> = user_playlists
-            .iter()
-            .map(|pl| spotify.playlist(pl.id.clone(), None, None).unwrap())
-            .collect();
+        let playlists = user_playlists;
         println!(
             "Built {} playlists from spotify data in {:.2?}",
             playlists.len(),
