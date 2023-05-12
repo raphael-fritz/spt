@@ -6,7 +6,6 @@ use spt::login;
 use spt::types;
 use spt::Commands;
 use std::env;
-use std::fmt::Write;
 use std::time::Instant;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -57,8 +56,7 @@ fn main() {
 
     // Load stored events from file
     let before = Instant::now();
-    let mut store_path = String::new();
-    write!(store_path, "{}/{}.json", DATA_DIR, DATA_FILE).unwrap();
+    let store_path = format!("{}/{}.json", DATA_DIR, DATA_FILE);
     let event_store = JSONEventStore::from_file(&store_path);
     let event_store = match event_store {
         Ok(store) => {
@@ -103,7 +101,7 @@ fn main() {
         let before = Instant::now();
         let user_playlists: Vec<model::SimplifiedPlaylist> = spotify
             .user_playlists(model::UserId::from_id_or_uri(&user.id).unwrap())
-            .map(|res| res.unwrap())
+            .flatten()
             .collect();
 
         // filter out all playlists not owned by the user (e.g. the Daily Mix etc.)
