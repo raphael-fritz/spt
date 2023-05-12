@@ -179,11 +179,11 @@ pub trait Aggregate {
     type Command;
     type State: AggregateState + Clone;
 
-    fn apply_event(state: &Self::State, evt: &Self::Event) -> Result<Self::State>;
+    fn apply_event(state: Self::State, evt: &Self::Event) -> Result<Self::State>;
     fn handle_command(state: &Self::State, cmd: &Self::Command) -> Result<Vec<Self::Event>>;
-    fn apply_all(state: &Self::State, evts: &[Self::Event]) -> Result<Self::State> {
-        evts.iter().try_fold(state.clone(), |acc_state, event| {
-            Self::apply_event(&acc_state, event)
+    fn apply_all(state: Self::State, evts: &[Self::Event]) -> Result<Self::State> {
+        evts.iter().try_fold(state, |acc_state, event| {
+            Self::apply_event(acc_state, event)
         })
     }
 }

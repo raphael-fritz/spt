@@ -77,7 +77,7 @@ impl Aggregate for PlaylistAggregate {
     type State = PlaylistData;
     type Command = PlaylistCommand;
 
-    fn apply_event(state: &Self::State, evt: &Self::Event) -> Result<Self::State> {
+    fn apply_event(state: Self::State, evt: &Self::Event) -> Result<Self::State> {
         let state = match &*evt {
             PlaylistEvent::CreatedPlaylist(_id, playlist) => PlaylistData {
                 data: playlist.to_owned(),

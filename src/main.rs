@@ -151,7 +151,7 @@ fn main() {
             let plevent = spt::compare(&spotify, &local, &playlist, None, None).unwrap();
             if !plevent.is_empty() {
                 // Calculate new state
-                let _state = domain::PlaylistAggregate::apply_all(&local, &plevent).unwrap();
+                let _state = domain::PlaylistAggregate::apply_all(local.clone(), &plevent).unwrap();
 
                 // Save all events
                 for event in plevent {

@@ -73,7 +73,7 @@ pub fn build_local(
 ) -> eventsourcing::Result<domain::PlaylistData> {
     let events: Vec<domain::PlaylistEvent> = pl_store.get_all(origin_id.to_string());
     let state = domain::PlaylistData::new();
-    let state = domain::PlaylistAggregate::apply_all(&state, &events)?;
+    let state = domain::PlaylistAggregate::apply_all(state, &events)?;
     Ok(state)
 }
 
