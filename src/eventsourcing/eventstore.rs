@@ -88,8 +88,9 @@ impl JSONEventStore {
         let guard = self.evts.lock().unwrap();
         let matches = guard
             .iter()
-            .map(|evt| evt.clone().into())
-            .filter(|evt: &E| evt.event_origin_id() == id)
+            .filter(|evt| evt.origin_id == id)
+            .cloned()
+            .map(|event| event.into())
             .collect();
         matches
     }
@@ -98,15 +99,14 @@ impl JSONEventStore {
         &self,
         id: String,
         start: DateTime<Utc>,
-    ) -> Result<Vec<E>> {
+    ) -> Vec<E> {
         let guard = self.evts.lock().unwrap();
-        let matches = guard
+        guard
             .iter()
-            .filter(|evt| evt.event_time >= start)
-            .map(|evt| evt.clone().into())
-            .filter(|evt: &E| evt.event_origin_id() == id)
-            .collect();
-        Ok(matches)
+            .filter(|evt| evt.event_time >= start && evt.origin_id == id)
+            .cloned()
+            .map(|event| event.into())
+            .collect()
     }
 
     pub fn get_range<E: Event + std::convert::From<UniqueEvent>>(
@@ -114,14 +114,13 @@ impl JSONEventStore {
         id: String,
         start: DateTime<Utc>,
         end: DateTime<Utc>,
-    ) -> Result<Vec<E>> {
+    ) -> Vec<E> {
         let guard = self.evts.lock().unwrap();
-        let matches = guard
+        guard
             .iter()
-            .filter(|evt| evt.event_time >= start && evt.event_time <= end)
-            .map(|evt| evt.clone().into())
-            .filter(|evt: &E| evt.event_origin_id() == id)
-            .collect();
-        Ok(matches)
+            .filter(|evt| evt.event_time >= start && evt.event_time <= end && evt.origin_id == id)
+            .cloned()
+            .map(|event| event.into())
+            .collect()
     }
 }
