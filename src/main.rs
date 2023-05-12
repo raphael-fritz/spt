@@ -69,7 +69,7 @@ fn main() {
             store
         }
         Err(err) => {
-            println!(
+            eprintln!(
                 "Failed to create eventstore from {}: {}\nUsing new one instead...",
                 store_path, err
             );
@@ -132,10 +132,7 @@ fn main() {
 
         // Build playlists from spotify data
         let before = Instant::now();
-        let playlists: Vec<model::FullPlaylist> = user_playlists
-            .iter()
-            .map(|pl| spotify.playlist(pl.id.clone(), None, None).unwrap())
-            .collect();
+        let playlists = user_playlists;
         println!(
             "Built {} playlists from spotify data in {:.2?}",
             playlists.len(),
@@ -168,11 +165,11 @@ fn main() {
     let before = Instant::now();
     match event_store.save_events(&store_path) {
         Ok(_) => println!(
-            "Saved all events to {} in {:.2?}",
+            "\nSaved all events to {} in {:.2?}",
             store_path,
             before.elapsed()
         ),
-        Err(err) => println!("Failed to save events to {}: {}", store_path, err),
+        Err(err) => eprintln!("\nFailed to save events to {}: {}", store_path, err),
     }
 
     println!("\nFinished in {:.2?}\n", runtime.elapsed());
