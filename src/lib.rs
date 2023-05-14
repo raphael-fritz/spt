@@ -79,6 +79,8 @@ pub fn build_local(
 
 /// compare local and new version and return events if changes occured
 pub fn compare(
+    username: &str,
+    multi: &indicatif::MultiProgress,
     client: &AuthCodeSpotify,
     state: &domain::PlaylistData,
     playlist: &model::SimplifiedPlaylist,
@@ -88,7 +90,12 @@ pub fn compare(
     let mut plevents: Vec<domain::PlaylistEvent> = Vec::new();
 
     if state.generation == 0 {
-        println!("Created {} ( {} )", playlist.name, playlist.id);
+        multi
+            .println(format!(
+                "[{}] Created {} ( {} )",
+                username, playlist.name, playlist.id
+            ))
+            .unwrap();
         let playlist = types::Playlist::from_id(&client, playlist.id.clone(), fields, market)?;
         let cmd = domain::PlaylistCommand::CreatePlaylist(playlist.id.clone(), playlist.clone());
         let evts = domain::PlaylistAggregate::handle_command(&state, &cmd)?;
@@ -99,7 +106,12 @@ pub fn compare(
 
         // UpdateName Event
         if state.data.name != playlist.name {
-            println!("Updated name for {} ( {} )", state.data.name, state.data.id);
+            multi
+                .println(format!(
+                    "[{}] Updated name for {} ( {} )",
+                    username, state.data.name, state.data.id
+                ))
+                .unwrap();
             let cmd =
                 domain::PlaylistCommand::UpdateName(playlist.id.to_string(), playlist.name.clone());
             let evts = domain::PlaylistAggregate::handle_command(&state, &cmd)?;
@@ -111,10 +123,12 @@ pub fn compare(
 
             // UpdateDescription Event
             if state.data.description != playlist.description {
-                println!(
-                    "Updated description for {} ( {} )",
-                    state.data.name, state.data.id
-                );
+                multi
+                    .println(format!(
+                        "[{}] Updated description for {} ( {} )",
+                        username, state.data.name, state.data.id
+                    ))
+                    .unwrap();
                 let cmd = domain::PlaylistCommand::UpdateDesciption(
                     playlist.id.to_string(),
                     playlist.description.clone(),
@@ -132,7 +146,12 @@ pub fn compare(
                 // AddTracks Event
                 let addedtracks: HashSet<_> = plhash.difference(&localphash).collect();
                 if !addedtracks.is_empty() {
-                    println!("Added tracks to {} ( {} ) ", state.data.name, state.data.id);
+                    multi
+                        .println(format!(
+                            "[{}] Added tracks to {} ( {} ) ",
+                            username, state.data.name, state.data.id
+                        ))
+                        .unwrap();
                     let cmd = domain::PlaylistCommand::AddTracks(
                         playlist.id.clone(),
                         playlist.snapshot_id.clone(),
@@ -145,10 +164,12 @@ pub fn compare(
                 // RemovedTracks Event
                 let removedtracks: HashSet<_> = localphash.difference(&plhash).collect();
                 if !removedtracks.is_empty() {
-                    println!(
-                        "Removed tracks from {} ( {} ) ",
-                        state.data.name, state.data.id
-                    );
+                    multi
+                        .println(format!(
+                            "[{}] Removed tracks from {} ( {} ) ",
+                            username, state.data.name, state.data.id
+                        ))
+                        .unwrap();
                     let cmd = domain::PlaylistCommand::RemoveTracks(
                         playlist.id.clone(),
                         playlist.snapshot_id.clone(),
