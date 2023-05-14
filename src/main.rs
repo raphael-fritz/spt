@@ -5,7 +5,6 @@ use spt::eventsourcing::prelude::*;
 use spt::login;
 use spt::types;
 use spt::Commands;
-use std::env;
 use std::time::Instant;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -17,8 +16,7 @@ fn main() {
     let runtime = Instant::now();
     println!("Spotify-Playlist-Tracker-v{}\n", VERSION);
 
-    let args: Vec<String> = env::args().collect();
-    let config = spt::Commands::build_local(&args);
+    let config = spt::Commands::build();
     let config = match config {
         Ok(config) => config,
         Err(err) => {
@@ -82,8 +80,8 @@ fn main() {
         Commands::DEFAULT => users,
         Commands::AddUser(config) => {
             let user = types::User {
-                display_name: Some(config.unwrap()[0].clone()),
-                id: rspotify::model::UserId::from_id(config.unwrap()[1].clone())
+                display_name: Some(config[0].clone()),
+                id: rspotify::model::UserId::from_id(config[1].clone())
                     .unwrap()
                     .to_string(),
             };

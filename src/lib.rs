@@ -8,28 +8,28 @@ use crate::eventsourcing::prelude::*;
 use rspotify::model;
 use rspotify::AuthCodeSpotify;
 use std::collections::HashSet;
+use std::env;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 #[derive(Debug, Clone)]
-pub enum Commands<'a> {
+pub enum Commands {
     DEFAULT,
     SINGLE,
-    AddUser(Option<&'a [String]>),
+    AddUser(Vec<String>),
 }
-
-impl Commands<'_> {
-    pub fn build_local(args: &[String]) -> Result<Commands, &'static str> {
-        if args.len() == 3 {
-            Ok(Commands::AddUser(Some(&args[2..args.len()])))
-        } else if args.len() == 2 {
-            Ok(Commands::SINGLE)
-        } else if args.len() == 1 {
-            Ok(Commands::DEFAULT)
-        } else {
-            Err("USAGE: spt.exe -n {{name}} {{id}} to add a new name\n       spt.exe to update data")
+impl Commands {
+    pub fn build() -> Result<Commands, &'static str> {
+        let args: Vec<String> = env::args().collect();
+        match (args.len(), args[1].as_str()) {
+            (1, _) => Ok(Commands::DEFAULT),
+            (2, "-s") => Ok(Commands::SINGLE),
+            (4, "-n") => Ok(Commands::AddUser(args[2..args.len()].to_vec())),
+            _ => Err("USAGE: spt.exe to update data\n       \
+                             spt.exe -n {{name}} {{id}} to add a new name\n       \
+                             spt.exe -s to update data for only the first user"),
         }
     }
 }
