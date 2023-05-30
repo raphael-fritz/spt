@@ -1,0 +1,11 @@
+import { ListView } from "std-widgets.slint";
+
+component Entry inherits Rectangle {
+    width: 180px;
+    height: 60px;
+    background: #00ccff;
+}
+
+export component Timeline inherits ListView {
+    for data in 50: Entry{}
+}

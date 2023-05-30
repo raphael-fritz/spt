@@ -1,0 +1,46 @@
+import { ListView } from "std-widgets.slint";
+
+export component User inherits Rectangle {
+    background: #0000002f;
+
+    HorizontalLayout {
+        spacing: 10px;
+        alignment: start;
+        padding: 6px;
+
+        profilepic := Rectangle {
+            width: 40px;
+            height: 40px;
+            clip: true;
+            background: #b4b3b3;
+            border-radius: self.width/2;
+
+            Image {
+                width: parent.width;
+                height: parent.height;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 5px;
+
+            username := Text {
+                width: 100px;
+                text: "Username";
+            }
+
+            in-out property <int> events: 0;
+            events := Text {
+                text: parent.events + " Events";
+                font-size: 10px;
+            }
+        }
+    }
+}
+
+export component UserList inherits ListView {
+    width: 200px;
+    horizontal-stretch: 1;
+    for data in 50 : User {}
+}

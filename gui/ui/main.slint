@@ -1,12 +1,41 @@
+import { Button, ListView, HorizontalBox } from "std-widgets.slint";
+import { User, UserList } from "user.slint";
+import { Timeline } from "timeline.slint";
+
+component MyButton inherits Rectangle {
+    width: 200px;
+    height: 100px;
+    background: #ececec;
+    border-color: black;
+    border-width: 2px;
+    vertical-stretch: 0;
+
+    in-out property <int> counter: 0;
+    button := Button {
+        width: parent.width;
+        height: parent.height;
+        text: "Button, pressed " + root.counter + " times";
+        clicked => {
+            root.counter += 1;
+        }
+    }
+}
+
 export component MainWindow inherits Window {
-    width: 400px;
-    height: 400px;
+    preferred-height: 700px;
+    preferred-width: 1200px;
     background: #ffff;
 
-    Text {
-       y: parent.width / 2;
-       x: parent.x + 200px;
-       text: "Hello, world";
-       color: black;
+    HorizontalLayout {
+        alignment: stretch;
+
+        UserList {}
+        Timeline {}
+        VerticalLayout {
+            alignment: end;
+            padding: 10px;
+            
+            MyButton {}
+        }
     }
 }
