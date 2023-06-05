@@ -20,3 +20,8 @@ This application is in very early development and isn't doing much useful stuff 
 - [Event Sourcing with Aggregates](https://medium.com/capital-one-tech/event-sourcing-with-aggregates-in-rust-4022af41cf67)
 - ["impl trait for vec"](https://github.com/apolitical/impl-display-for-vec)
 - ["Indicatif"](https://docs.rs/indicatif/latest/indicatif/)
+- ["Slint Layouting"](https://slint-ui.com/releases/0.2.0/docs/rust/slint/docs/layouting/)
+- ["Slint Builtin Elements"](https://slint-ui.com/releases/0.2.0/docs/rust/slint/docs/builtin_elements/)
+- ["Slint Widgets"](https://slint-ui.com/releases/0.2.0/docs/rust/slint/docs/widgets/)
+- ["Slint Language Reference"](https://slint-ui.com/releases/0.2.0/docs/rust/slint/docs/langref/)
+- ["Slint Online Editor"](https://slint-ui.com/releases/1.0.2/editor/)

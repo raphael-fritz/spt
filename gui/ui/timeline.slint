@@ -1,11 +1,66 @@
-import { ListView } from "std-widgets.slint";
+import { ListView, HorizontalBox, GroupBox } from "std-widgets.slint";
 
-component Entry inherits Rectangle {
-    width: 180px;
-    height: 60px;
-    background: #00ccff;
+export struct EntryData {
+    date: string,
+    open: bool,
+    events: [string],
 }
 
-export component Timeline inherits ListView {
-    for data in 50: Entry{}
+component Entry inherits Rectangle {
+    in-out property <EntryData> model;
+    in-out property <int> font-size: 20;
+
+    VerticalLayout {
+        alignment: start;
+        spacing: 2px;
+
+        TouchArea {
+            clicked => { model.open = !model.open; }
+            
+            HorizontalLayout {
+                alignment: start;
+                spacing: 5px;
+
+                Text {
+                    text: (model.open ? "⊟" : "⊞");
+                    vertical-alignment: center;
+                    font-size: root.font-size*1px;
+                    y:  - 0.2 * self.font-size;
+                }
+                
+                Text {
+                    vertical-alignment: center;
+                    font-size: root.font-size*1px;
+                    text: model.date;
+                }
+            }
+        }
+        
+        if model.open : ListView {
+            for dep in model.events : HorizontalLayout {
+                spacing: 10px;
+
+                Rectangle { width: 20px; }
+                Text {
+                    text: dep;
+                    horizontal-alignment: left;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
+
+export component Timeline inherits GroupBox {
+    title: "Timeline";
+    vertical-stretch: 1;
+    
+    ListView {
+        vertical-stretch: 0;
+        for i in 30 : HorizontalBox {
+            Entry {
+                model: { date: "2023-06-" + (i+1) , open: true , events: ["Added Tracks to xyz", "Updated Description for foo to bar", ], };
+            }
+        }
+    }
 }

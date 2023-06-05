@@ -24,11 +24,8 @@ component MyButton inherits Rectangle {
 export component MainWindow inherits Window {
     preferred-height: 700px;
     preferred-width: 1200px;
-    background: #ffff;
 
-    HorizontalLayout {
-        alignment: stretch;
-
+    HorizontalBox {
         UserList {}
         Timeline {}
         VerticalLayout {
