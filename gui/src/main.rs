@@ -1,4 +1,5 @@
-slint::include_modules!();
+use gui::Application;
+
 fn main() {
-    MainWindow::new().unwrap().run().unwrap();
+    Application::new().unwrap().run().unwrap()
 }

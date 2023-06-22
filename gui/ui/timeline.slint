@@ -51,16 +51,11 @@ component Entry inherits Rectangle {
     }
 }
 
-export component Timeline inherits GroupBox {
-    title: "Timeline";
-    vertical-stretch: 1;
-    
-    ListView {
-        vertical-stretch: 0;
-        for i in 30 : HorizontalBox {
-            Entry {
-                model: { date: "2023-06-" + (i+1) , open: true , events: ["Added Tracks to xyz", "Updated Description for foo to bar", ], };
-            }
+export component Timeline inherits ListView {    
+    in property <[EntryData]> model;
+    for event in model : HorizontalBox {
+        Entry {
+            model: event;
         }
     }
 }
