@@ -23,13 +23,17 @@ pub enum Commands {
 impl Commands {
     pub fn build() -> Result<Commands, &'static str> {
         let args: Vec<String> = env::args().collect();
-        match (args.len(), args[1].as_str()) {
-            (1, _) => Ok(Commands::DEFAULT),
-            (2, "-s") => Ok(Commands::SINGLE),
-            (4, "-n") => Ok(Commands::AddUser(args[2..args.len()].to_vec())),
-            _ => Err("USAGE: spt.exe to update data\n       \
-                             spt.exe -n {{name}} {{id}} to add a new name\n       \
-                             spt.exe -s to update data for only the first user"),
+        let len = args.len();
+        if len <= 1 {
+            Ok(Commands::DEFAULT)
+        } else {
+            match (len, args[1].as_str()) {
+                (2, "-s") => Ok(Commands::SINGLE),
+                (4, "-n") => Ok(Commands::AddUser(args[2..args.len()].to_vec())),
+                _ => Err("USAGE: spt.exe to update data\n       \
+                                 spt.exe -n {{name}} {{id}} to add a new name\n       \
+                                 spt.exe -s to update data for only the first user"),
+            }
         }
     }
 }
