@@ -1,4 +1,7 @@
-use slint::{ModelRc, SharedString, VecModel, Weak};
+use slint::{
+    EventLoopError, Image, Model, ModelRc, Rgb8Pixel, SharedPixelBuffer, SharedString, VecModel,
+    Weak,
+};
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -16,6 +19,66 @@ pub enum UIEvents {
     CloseRequested,
     Update,
     UserClicked(SharedString),
+}
+
+pub struct User {
+    id: String,
+    events: i32,
+    name: Option<String>,
+    img: SharedPixelBuffer<Rgb8Pixel>,
+}
+
+impl User {
+    pub fn new(
+        id: &str,
+        events: i32,
+        name: Option<&str>,
+        img: SharedPixelBuffer<Rgb8Pixel>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            events: events,
+            name: name.map(|s| s.into()),
+            img: img,
+        }
+    }
+}
+
+impl From<User> for UserData {
+    fn from(value: User) -> Self {
+        Self {
+            events: value.events,
+            id: value.id.into(),
+            name: value.name.unwrap_or_default().into(),
+            picture: Image::from_rgb8(value.img),
+        }
+    }
+}
+
+pub struct Users {
+    handle: Weak<MainWindow>,
+}
+
+impl Users {
+    pub fn new(handle: Weak<MainWindow>) -> Result<Self, EventLoopError> {
+        let users = Self { handle };
+        users.init()?;
+        Ok(users)
+    }
+
+    fn init(&self) -> Result<(), EventLoopError> {
+        self.handle.upgrade_in_event_loop(move |handle| {
+            handle.set_users(ModelRc::new(VecModel::default()))
+        })
+    }
+
+    pub fn add_user(&self, user: User) -> Result<(), EventLoopError> {
+        self.handle.upgrade_in_event_loop(move |handle| {
+            let users = handle.get_users();
+            let users: &VecModel<UserData> = users.as_any().downcast_ref().unwrap();
+            users.push(user.into());
+        })
+    }
 }
 
 pub struct Controller {

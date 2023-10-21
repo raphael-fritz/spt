@@ -1,5 +1,5 @@
-use gui::{Controller, MainWindow, UIEvents, UserData};
-use slint::{ComponentHandle, Image, ModelRc, PlatformError, SharedPixelBuffer, VecModel};
+use gui::{Controller, MainWindow, UIEvents, User, Users};
+use slint::{ComponentHandle, ModelRc, PlatformError, SharedPixelBuffer, VecModel};
 use std::{error::Error, sync::mpsc};
 
 pub struct Application {
@@ -14,17 +14,11 @@ impl Application {
         let _controller = Controller::new(gui.as_weak(), rx);
 
         // Initialize User and Event Models
-        let imgbuf = SharedPixelBuffer::new(40, 40);
-        let user = UserData {
-            id: "Test".into(),
-            events: 0,
-            name: "TestUser".into(),
-            picture: Image::from_rgb8(imgbuf),
-        };
-        let users = VecModel::default();
-        users.push(user);
+        let users = Users::new(gui.as_weak()).unwrap();
+        let user = User::new("Test", 0, Some("TestUser"), SharedPixelBuffer::new(40, 40));
+        users.add_user(user).unwrap();
+
         let events = VecModel::default();
-        gui.set_users(ModelRc::new(users));
         gui.set_events(ModelRc::new(events));
 
         // Close Requested callback
