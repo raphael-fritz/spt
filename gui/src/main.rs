@@ -1,6 +1,10 @@
 use gui::{Controller, MainWindow, UIEvents, User, Users};
-use slint::{ComponentHandle, ModelRc, PlatformError, SharedPixelBuffer, VecModel};
+use rspotify::{model, prelude::BaseClient};
+use slint::{ComponentHandle, ModelRc, PlatformError, VecModel};
 use std::{error::Error, sync::mpsc};
+
+const USER_FILE: &str = "data/users.json";
+const DATA_FILE: &str = "data/events.json";
 
 pub struct Application {
     _controller: Controller,
@@ -13,11 +17,32 @@ impl Application {
         let (tx, rx) = mpsc::channel::<UIEvents>();
         let _controller = Controller::new(gui.as_weak(), rx);
 
-        // Initialize User and Event Models
-        let users = Users::new(gui.as_weak()).unwrap();
-        let user = User::new("Test", 0, Some("TestUser"), SharedPixelBuffer::new(40, 40));
-        users.add_user(user).unwrap();
+        // Authenticate with OAuth
+        let spotify = match spt::login::login() {
+            Ok(spotify) => spotify,
+            Err(why) => {
+                eprintln!("Login failed: {why}");
+                std::process::exit(1)
+            }
+        };
 
+        // Load Events
+        let eventstore =
+            spt::eventsourcing::eventstore::JSONEventStore::from_file(DATA_FILE).unwrap();
+
+        // Load Users and initialize User Model
+        let users = Users::new(gui.as_weak()).unwrap();
+        for user in spt::load_users(USER_FILE).unwrap() {
+            if let Ok(user) = spotify.user(model::UserId::from_id_or_uri(&user.id).unwrap()) {
+                let playlists: Vec<model::SimplifiedPlaylist> =
+                    spotify.user_playlists(user.id.clone()).flatten().collect();
+                if let Ok(user) = User::from_spotify(user, playlists, &eventstore) {
+                    users.add_user(user).unwrap();
+                }
+            }
+        }
+
+        // Initialize Event Model
         let events = VecModel::default();
         gui.set_events(ModelRc::new(events));
 

@@ -7,6 +7,10 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.26"
+image = "0.24.7"
+reqwest = { version = "0.11.22", features = ["blocking"] }
+rspotify = { version = "0.11.6", default-features = false, features = ["cli", "client-ureq", "ureq-rustls-tls"] }
+spt = { path = "../../spt" }
 slint = "1.0.2"
 
 [build-dependencies]

@@ -11,6 +11,7 @@ This application is in very early development and isn't doing much useful stuff 
 - [ ] Handle errors (especially in Playlist.from_id)
 - [ ] GUI to analyze data
 - [ ] Don't emit AddedTracks/RemovedTracks event if only track details have changed (e.g. if the name of a track changes)
+- [ ] Fix "exit code: 0xc0000005, STATUS_ACCESS_VIOLATION" error when scrolling users too far down
 
 ## Useful links
 
