@@ -4,7 +4,7 @@ import { EntryData, Timeline } from "timeline.slint";
 
 component MyButton inherits Rectangle {
     width: 200px;
-    height: 100px;
+    height: 80px;
     
     callback clicked <=> button.clicked;
     button := Button {
@@ -15,14 +15,15 @@ component MyButton inherits Rectangle {
 }
 
 export component MainWindow inherits Window {
-    min-height: 600px;
-    min-width: 950px;
-    preferred-height: 700px;
-    preferred-width: 1200px;
+    min-height: 250px;
+    min-width: 800px;
+    preferred-height: 600px;
+    preferred-width: 1000px;
 
     in-out property <[EntryData]> events;
     in-out property <[UserData]> users;
     callback update <=> button.clicked;
+    callback user-clicked <=> userlist.clicked;
 
 
     HorizontalBox {
@@ -30,7 +31,7 @@ export component MainWindow inherits Window {
             spacing: 3px;
 
             Text { text: "Users"; }
-            UserList { model: users; }
+            userlist := UserList { model: users; }
         }
 
         VerticalLayout {

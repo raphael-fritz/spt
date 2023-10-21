@@ -1,8 +1,8 @@
-use slint::{PlatformError, Weak};
+use slint::{ModelRc, SharedString, VecModel, Weak};
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, Receiver, RecvTimeoutError},
+        mpsc::{Receiver, RecvTimeoutError},
         Arc,
     },
     thread,
@@ -12,13 +12,13 @@ use std::{
 slint::include_modules!();
 
 #[derive(Debug)]
-enum UIEvents {
+pub enum UIEvents {
     CloseRequested,
     Update,
-    // ShowUserEvents,
+    UserClicked(SharedString),
 }
 
-struct Controller {
+pub struct Controller {
     handle: Weak<MainWindow>,
     flag: Arc<AtomicBool>,
     thandle: Option<thread::JoinHandle<()>>,
@@ -29,7 +29,8 @@ impl Controller {
         let flag = Arc::new(AtomicBool::new(true));
         let thandle = Some({
             let flag = flag.clone();
-            thread::spawn(move || Self::run(flag, rx))
+            let handle = handle.clone();
+            thread::spawn(move || Self::run(flag, rx, handle))
         });
 
         Controller {
@@ -39,7 +40,7 @@ impl Controller {
         }
     }
 
-    fn run(flag: Arc<AtomicBool>, rx: Receiver<UIEvents>) {
+    fn run(flag: Arc<AtomicBool>, rx: Receiver<UIEvents>, handle: Weak<MainWindow>) {
         while flag.load(Ordering::Relaxed) {
             let event = match rx.recv_timeout(Duration::from_millis(500)) {
                 Ok(val) => val,
@@ -47,7 +48,33 @@ impl Controller {
                 Err(RecvTimeoutError::Disconnected) => break,
             };
             println!("{event:?}");
+
+            if let UIEvents::UserClicked(id) = event {
+                let events = vec![(id.into(), false, vec!["Test123".into(), "Test456".into()])];
+                Self::update_timeline(handle.clone(), events);
+            }
         }
+    }
+
+    fn update_timeline(handle: Weak<MainWindow>, new: Vec<(String, bool, Vec<String>)>) {
+        handle
+            .upgrade_in_event_loop(move |handle| {
+                handle.set_events(ModelRc::new(VecModel::from_slice(
+                    &new.into_iter()
+                        .map(|(date, open, events)| EntryData {
+                            date: date.into(),
+                            events: ModelRc::new(VecModel::from_slice(
+                                &events
+                                    .into_iter()
+                                    .map(|s| s.into())
+                                    .collect::<Vec<SharedString>>(),
+                            )),
+                            open,
+                        })
+                        .collect::<Vec<EntryData>>(),
+                )));
+            })
+            .unwrap()
     }
 }
 
@@ -55,39 +82,5 @@ impl Drop for Controller {
     fn drop(&mut self) {
         self.flag.store(false, Ordering::Relaxed);
         self.thandle.take().unwrap().join().unwrap();
-    }
-}
-
-pub struct Application {
-    controller: Controller,
-    gui: MainWindow,
-}
-
-impl Application {
-    pub fn new() -> Result<Self, PlatformError> {
-        let gui = MainWindow::new()?;
-        let (tx, rx) = mpsc::channel::<UIEvents>();
-        let controller = Controller::new(gui.as_weak(), rx);
-
-        // Close Requested callback
-        {
-            let tx = tx.clone();
-            gui.window().on_close_requested(move || {
-                tx.send(UIEvents::CloseRequested).unwrap();
-                slint::CloseRequestResponse::HideWindow
-            });
-        }
-
-        // Update Button callback
-        {
-            let tx = tx.clone();
-            gui.on_update(move || tx.send(UIEvents::Update).unwrap());
-        }
-
-        Ok(Self { controller, gui })
-    }
-
-    pub fn run(&self) -> Result<(), slint::PlatformError> {
-        self.gui.run()
     }
 }

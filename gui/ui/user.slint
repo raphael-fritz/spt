@@ -1,6 +1,7 @@
 import { ListView, HorizontalBox } from "std-widgets.slint";
 
 export struct UserData {
+    id: string,
     name: string,
     picture: image,
     events: int,
@@ -8,37 +9,40 @@ export struct UserData {
 
 export component User inherits Rectangle {
     in property <UserData> model;
+    callback clicked <=> area.clicked;
 
-    HorizontalLayout {
-        spacing: 10px;
-        alignment: start;
-        padding: 6px;
+    area := TouchArea {
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+            padding: 6px;
 
-        Rectangle {
-            width: 40px;
-            height: 40px;
-            clip: true;
-            border-radius: self.width/2;
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                clip: true;
+                border-radius: self.width/2;
 
-            Image {
-                width: parent.width;
-                height: parent.height;
-                source: model.picture;
-            }
-        }
-
-        VerticalLayout {
-            alignment: center;
-            spacing: 5px;
-
-            username := Text {
-                width: 100px;
-                text: model.name;
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: model.picture;
+                }
             }
 
-            Text {
-                text: model.events + " Events";
-                font-size: 10px;
+            VerticalLayout {
+                alignment: center;
+                spacing: 5px;
+
+                username := Text {
+                    width: 100px;
+                    text: model.name;
+                }
+
+                Text {
+                    text: model.events + " Events";
+                    font-size: 10px;
+                }
             }
         }
     }
@@ -47,8 +51,12 @@ export component User inherits Rectangle {
 export component UserList inherits ListView {
     width: 200px;
     
+    callback clicked(string);
     in property <[UserData]> model;
     for user in model : HorizontalBox {
-        User {model: user;}
+        User {
+            model: user;
+            clicked => { root.clicked(user.id) }
+        }
     }
 }
