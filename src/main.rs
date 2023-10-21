@@ -17,44 +17,23 @@ const MAIN_STYLE: &str = "[{elapsed_precise}][{bar:40.green/white}][{pos:>3}/{le
 const LOWER_STYLE: &str = "          [{bar:40.green/white}][{pos:>3}/{len:3}]: {msg}";
 const PROGRESS_CHARS: &str = "=>-";
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Spotify-Playlist-Tracker-v{}\n", VERSION);
 
-    let config = spt::Commands::build();
-    let config = match config {
-        Ok(config) => config,
-        Err(err) => {
-            eprintln!("{}", err);
-            std::process::exit(1)
-        }
-    };
+    let config = spt::Commands::build()?;
 
     // Authenticate with OAuth
-    let spotify = match login::login() {
-        Ok(spotify) => spotify,
-        Err(why) => {
-            eprintln!("Login failed: {why}");
-            std::process::exit(1)
-        }
-    };
+    let spotify = login::login()?;
 
     // Load Users
     let before = Instant::now();
-    let users = match spt::load_users(USER_FILE) {
-        Ok(users) => {
-            println!(
-                "Loaded {} users from {} in {:.2?}",
-                users.len(),
-                USER_FILE,
-                before.elapsed()
-            );
-            users
-        }
-        Err(err) => {
-            eprintln!("Failed to load users from {}: {}", USER_FILE, err);
-            std::process::exit(1)
-        }
-    };
+    let users = spt::load_users(USER_FILE)?;
+    println!(
+        "Loaded {} users from {} in {:.2?}",
+        users.len(),
+        USER_FILE,
+        before.elapsed()
+    );
 
     // Load stored events from file
     let before = Instant::now();
@@ -96,12 +75,8 @@ fn main() {
 
     let target = ProgressDrawTarget::stderr_with_hz(120);
     let multi = MultiProgress::with_draw_target(target);
-    let stylemain = ProgressStyle::with_template(MAIN_STYLE)
-        .unwrap()
-        .progress_chars(PROGRESS_CHARS);
-    let style = ProgressStyle::with_template(LOWER_STYLE)
-        .unwrap()
-        .progress_chars(PROGRESS_CHARS);
+    let stylemain = ProgressStyle::with_template(MAIN_STYLE)?.progress_chars(PROGRESS_CHARS);
+    let style = ProgressStyle::with_template(LOWER_STYLE)?.progress_chars(PROGRESS_CHARS);
     let pb = ProgressBar::new(users.len() as u64).with_style(stylemain);
     let pb = multi.insert(0, pb);
     pb.tick();
@@ -115,13 +90,13 @@ fn main() {
             pbs.clear();
         }
 
-        let nameorid = user.display_name.clone().unwrap_or(user.id.clone());
+        let nameorid = user.name_or_id();
         pb.set_message(format!("{}", nameorid));
         pb.set_prefix(format!("{}", nameorid));
 
         // Build playlists from spotify data
         let user_playlists: Vec<ClientResult<model::SimplifiedPlaylist>> = spotify
-            .user_playlists(model::UserId::from_id_or_uri(&user.id).unwrap())
+            .user_playlists(model::UserId::from_id_or_uri(&user.id)?)
             .collect();
 
         let pb1 = ProgressBar::new(user_playlists.len() as u64).with_style(style.clone());
@@ -133,7 +108,7 @@ fn main() {
         let user_playlists: Vec<model::SimplifiedPlaylist> = user_playlists
             .into_iter()
             .progress_with(pb1.clone())
-            .flatten() // throw away Resullt:Err(_) entries
+            .flatten() // throw away Result:Err(_) entries
             .filter(|pl| pl.owner.id.to_string() == user.id) // filter out all playlists not owned by the user (e.g. the Daily Mix etc.)
             .collect();
         let playlists = &user_playlists;
@@ -212,4 +187,6 @@ fn main() {
         ),
         Err(err) => eprintln!("Failed to save events to {}: {}", store_path, err),
     }
+
+    Ok(())
 }

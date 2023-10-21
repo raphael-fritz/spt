@@ -68,6 +68,9 @@ impl User {
             id: String::new(),
         }
     }
+    pub fn name_or_id(&self) -> &str {
+        self.display_name.as_ref().unwrap_or(&self.id)
+    }
 }
 impl From<model::PublicUser> for User {
     fn from(item: model::PublicUser) -> Self {
