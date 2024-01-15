@@ -150,15 +150,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &playlist,
                 None,
                 None,
-            )
-            .unwrap();
-            if !plevent.is_empty() {
-                // Calculate new state
-                let _state = domain::PlaylistAggregate::apply_all(local.clone(), &plevent).unwrap();
+            );
+            match plevent {
+                Ok(plevent) => {
+                    if !plevent.is_empty() {
+                        // Calculate new state
+                        let _state =
+                            domain::PlaylistAggregate::apply_all(local.clone(), &plevent).unwrap();
 
-                // Save all events
-                for event in plevent {
-                    let _store_result = event_store.append(event.clone(), "playlists").unwrap();
+                        // Save all events
+                        for event in plevent {
+                            let _store_result =
+                                event_store.append(event.clone(), "playlists").unwrap();
+                        }
+                    }
+                }
+                Err(why) => {
+                    multi
+                        .println(format!(
+                            "[{}] Failed to compare playlist {} ( {} ): {}",
+                            &user.display_name.clone().unwrap_or(user.id.clone()),
+                            playlist.name,
+                            playlist.id,
+                            why
+                        ))
+                        .unwrap();
                 }
             }
             pb3.inc(1);
